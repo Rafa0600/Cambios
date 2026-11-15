@@ -1293,9 +1293,9 @@ async function fetchConClave(url, opts = {}) {
     }
     throw new Error('Clave incorrecta: no se mandó nada');
 }
-async function mandarMensajeML(cuenta, venta, texto) {
+async function mandarMensajeML(cuenta, venta, texto, buyerId) {
     const r = await fetchConClave(`${ECOMM_PROXY}/ml-mensaje`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cuenta: String(cuenta || '').toLowerCase(), venta, texto }) });
+        body: JSON.stringify({ cuenta: String(cuenta || '').toLowerCase(), venta, texto, buyer_id: buyerId || '' }) });
     let d = null; try { d = await r.json(); } catch (e) {}
     if (!r.ok || !d || !d.ok) throw new Error((d && d.error) || ('respondió ' + r.status));
     return d;
@@ -1402,7 +1402,7 @@ async function abrirMensajes(c) {
             if (!confirm(`¿Mandarle este mensaje a ${c.nick || 'el comprador'}?\n\n${t}`)) return;
             const b = $('msgEnviar'); b.disabled = true; b.textContent = 'Enviando…';
             try {
-                await mandarMensajeML(c.cuenta, c.venta, t);                  // por Ecomm, con la clave del stock
+                await mandarMensajeML(c.cuenta, c.venta, t, buyerId);                  // por Ecomm, con la clave del stock
                 toast('✓ Mensaje enviado');
                 MSG_N.set(claveMsg(c), (MSG_N.get(claveMsg(c)) || 0) + 1);
                 await sleep(1500);                                            // que ML lo registre antes de recargar

@@ -243,6 +243,19 @@
             background: #24243f; color: var(--text); border: 1px solid var(--border-bright); border-radius: 14px; padding: 11px 14px;
             font-size: 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.6); max-width: 92vw; }
         .toast button { background: none; border: none; color: var(--yellow); font-weight: 700; font-size: 14px; }
+        .hdr-btn.on { border-color: rgba(255,230,0,.45); }
+        .banner { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; padding: 10px 12px; border-radius: 14px;
+            background: rgba(255,230,0,.07); border: 1px solid rgba(255,230,0,.3); font-size: 13px; }
+        .banner span { flex: 1; } .banner b { color: var(--yellow); }
+        .banner button { border: none; background: var(--yellow); color: #000; font-weight: 700; border-radius: 10px; height: 36px; padding: 0 12px; font-size: 13px; }
+        .banner button.x { background: none; color: var(--muted-2); padding: 0 4px; font-size: 16px; }
+        .aviso-hor { display: flex; gap: 8px; margin: 2px 0 10px; }
+        .aviso-hor div { flex: 1; background: var(--surface-2); border: 1px solid var(--border-bright); border-radius: 12px; padding: 10px 12px; }
+        .aviso-hor b { display: block; font-family: 'Space Mono', monospace; font-size: 22px; color: var(--yellow); }
+        .aviso-hor span { font-size: 12px; color: var(--muted-2); }
+        .aviso-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+        .aviso-btns .btn2 { height: 46px; font-size: 14.5px; }
+        .ok-txt { color: var(--green); font-weight: 700; margin: 12px 0 0; font-size: 14.5px; }
         .clave-box { max-width: 380px; margin: 60px auto; text-align: center; padding: 0 20px; }
         .clave-box p { color: var(--muted-2); font-size: 14px; margin: 10px 0 16px; line-height: 1.5; }
     </style>
@@ -251,6 +264,7 @@
 <header class="hdr">
     <div class="hdr-top">
         <h1>🔁 <span>Cambios</span></h1>
+        <button class="hdr-btn" id="btnAvisos" title="Avisos al celular">🔕</button>
         <button class="hdr-btn" id="btnRefrescar" title="Actualizar">⟳</button>
     </div>
     <div class="resumen" id="resumen"></div>
@@ -743,14 +757,14 @@ function pintar() {
         return;
     }
     if (!PEND.length) {
-        el.innerHTML = `<div class="vacio"><big>🎉</big>No hay cambios pendientes.<br>Tocá <b>＋ Nuevo cambio</b> para cargar uno.</div>`;
+        el.innerHTML = bannerAvisos() + `<div class="vacio"><big>🎉</big>No hay cambios pendientes.<br>Tocá <b>＋ Nuevo cambio</b> para cargar uno.</div>`;
         return;
     }
     const h = hoyAR(), grupos = new Map();
     const atr = PEND.filter(c => c.fecha < h);
     if (atr.length) grupos.set('atr', atr);
     PEND.filter(c => c.fecha >= h).forEach(c => { if (!grupos.has(c.fecha)) grupos.set(c.fecha, []); grupos.get(c.fecha).push(c); });
-    el.innerHTML = [...grupos].map(([k, cs]) => {
+    el.innerHTML = bannerAvisos() + [...grupos].map(([k, cs]) => {
         const tit = k === 'atr' ? `<div class="grupo-t atr"><b>⚠️ Atrasados</b><span>quedaron sin hacer</span><i>${cs.length}</i></div>`
             : `<div class="grupo-t${k === h ? ' hoy' : ''}"><b>${esc(relDia(k) || DIAS[diaSem(k)])}</b><span>${esc(relDia(k) ? nombreDia(k) : ddmm(k))}</span><i>${cs.length}</i></div>`;
         return tit + cs.map(cardHTML).join('');
@@ -797,6 +811,8 @@ $('lista').addEventListener('click', async e => {
         else toast(ok ? `✓ Copiado: ${cp.dataset.copiar}` : 'No se pudo copiar', null, null, 1600);
         return;
     }
+    if (e.target.closest('[data-avisos]')) return abrirAvisos();
+    if (e.target.closest('[data-avisos-x]')) { try { localStorage.setItem(PUSH_OCULTO, '1'); } catch (err) {} return pintar(); }
     const card = e.target.closest('.card');
     if (card && e.target.closest('[data-toggle]')) {         // tocar la tarjeta → se abre / se cierra
         const ab = card.classList.toggle('abierta');
@@ -1196,6 +1212,93 @@ async function abrirConQuien() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  AVISOS AL CELULAR (lun–vie 10:00 los de hoy · 13:00 los que quedan)
+//  El celu se anota en la nube (push_subs) y el Worker manda el aviso a esa hora.
+// ══════════════════════════════════════════════════════════════════════════
+const VAPID_PUBLIC = 'BOF91aLGKbOwpVo91aDXqSfIMzJxtN7TEbmcemnFH0ToJJDqPs77h5xXg9WGXfJptacsiFL7XNT6egE1avkXeEw';
+const PUSH_OCULTO = 'cambios_aviso_banner_oculto';
+const pushSoportado = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext;
+const b64uDec = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
+async function suscripcion() {
+    if (!pushSoportado() || Notification.permission !== 'granted') return null;
+    try {
+        const reg = await Promise.race([navigator.serviceWorker.ready, sleep(4000).then(() => null)]);
+        return reg ? await reg.pushManager.getSubscription() : null;
+    } catch (e) { return null; }
+}
+let AVISOS_ON = false;
+async function pintarCampana() {
+    AVISOS_ON = !!(await suscripcion());
+    const b = $('btnAvisos');
+    b.textContent = AVISOS_ON ? '🔔' : '🔕';
+    b.classList.toggle('on', AVISOS_ON);
+    if (clave()) pintar();
+}
+function bannerAvisos() {
+    let oculto = false; try { oculto = !!localStorage.getItem(PUSH_OCULTO); } catch (e) {}
+    if (AVISOS_ON || oculto || !pushSoportado() || Notification.permission === 'denied' || !clave()) return '';
+    return `<div class="banner"><span>🔔 ¿Te aviso los cambios a las <b>10</b> y a las <b>13</b>?</span>` +
+        `<button data-avisos="1">Activar</button><button class="x" data-avisos-x="1" title="No mostrar más">✕</button></div>`;
+}
+const nombreEquipo = () => { const u = navigator.userAgent; return `${/Android/.test(u) ? 'Android' : /iPhone|iPad/.test(u) ? 'iPhone' : 'PC'} · ${hoyAR()}`; };
+
+async function abrirAvisos() {
+    const s = await suscripcion();
+    let h = `<div class="sub-hd"><b>🔔 Avisos al celular</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+        `<div class="aviso-hor"><div><b>10:00</b><span>Los cambios de hoy</span></div><div><b>13:00</b><span>Los que quedan sin hacer</span></div></div>` +
+        `<div class="ayuda" style="margin:0">De lunes a viernes y solo si hay cambios. Llega aunque la app esté cerrada; tocás el aviso y se abre la lista.</div>`;
+    if (!pushSoportado()) h += `<div class="error">Acá no se pueden recibir avisos. Abrila desde la app instalada en el celu (Chrome).</div>`;
+    else if (Notification.permission === 'denied') h += `<div class="error">Los avisos están bloqueados para esta app.</div><div class="ayuda">Activalos en Ajustes del celu → Apps → Cambios (o Chrome) → Notificaciones, y volvé a tocar 🔕.</div>`;
+    else if (s) h += `<div class="ok-txt">✓ Activados en este celu</div><div class="aviso-btns">` +
+        `<button class="btn2 amarillo" id="avProbar">Mandarme un aviso de prueba</button><button class="btn2" id="avDesactivar">Desactivar en este celu</button></div>`;
+    else h += `<div class="aviso-btns"><button class="guardar" id="avActivar">🔔 Activar avisos en este celu</button></div>`;
+    h += `<div class="ayuda" id="avMsg" style="margin-top:10px"></div>`;
+    $('subIn').innerHTML = h;
+    $('sub').classList.add('open');
+    $('subIn').onclick = async e => {
+        const msg = (t, err) => { const m = $('avMsg'); if (m) { m.textContent = t; m.className = err ? 'error' : 'ayuda'; } };
+        if (e.target.closest('#avActivar')) {
+            try {
+                msg('Pidiendo permiso al celu…');
+                if (await Notification.requestPermission() !== 'granted') return msg('No se dio el permiso de avisos.', true);
+                const reg = await navigator.serviceWorker.ready;
+                let sub = await reg.pushManager.getSubscription();
+                if (sub && sub.options && sub.options.applicationServerKey) {     // anotado con otra clave → rehacer
+                    const k = new Uint8Array(sub.options.applicationServerKey);
+                    if (k.join() !== b64uDec(VAPID_PUBLIC).join()) { await sub.unsubscribe(); sub = null; }
+                }
+                if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uDec(VAPID_PUBLIC) });
+                const j = sub.toJSON();
+                msg('Anotando este celu en la nube…');
+                await api('/api/push/suscribir', { endpoint: j.endpoint, keys: j.keys, nombre: nombreEquipo() });
+                const r = await api('/api/push/probar', { endpoint: j.endpoint });
+                await pintarCampana();
+                abrirAvisos();
+                toast(r.ok ? '🔔 Listo: te mandé un aviso de prueba' : 'Quedó anotado, pero el aviso de prueba no salió', null, null, 5000);
+            } catch (err) { msg('No se pudo activar: ' + (err.clave ? 'falta la clave' : (err.message || err)), true); }
+            return;
+        }
+        if (e.target.closest('#avProbar')) {
+            try {
+                msg('Mandando…');
+                const sub = await suscripcion();
+                const r = await api('/api/push/probar', { endpoint: sub.endpoint });
+                msg(r.ok ? '✓ Enviado: en unos segundos te llega el aviso.' : 'No salió el aviso. Probá desactivar y activar de nuevo.', !r.ok);
+            } catch (err) { msg('No se pudo: ' + (err.message || err), true); }
+            return;
+        }
+        if (e.target.closest('#avDesactivar')) {
+            try {
+                const sub = await suscripcion();
+                if (sub) { await api('/api/push/borrar', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+                await pintarCampana(); abrirAvisos(); toast('🔕 Avisos desactivados en este celu');
+            } catch (err) { msg('No se pudo: ' + (err.message || err), true); }
+        }
+    };
+}
+$('btnAvisos').onclick = () => { if (!clave()) return pintarClave(); abrirAvisos(); };
+
+// ══════════════════════════════════════════════════════════════════════════
 //  ARRANQUE
 // ══════════════════════════════════════════════════════════════════════════
 function cambiarTab(t) {
@@ -1222,7 +1325,10 @@ if (PEND.length) pintar();
 refrescar();
 cargarCatalogo().then(() => { if (F) pintarForm(); if (clave()) pintar(); });
 
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+if ('serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register('./sw.js').then(r => { try { r.update(); } catch (e) {} }).catch(() => {});
+}
+pintarCampana();
 </script>
 </body>
 </html>

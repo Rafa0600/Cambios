@@ -67,7 +67,17 @@
         .card.m-confusion::before { background: var(--orange); }
         .card.m-otro::before { background: var(--purple); }
         .card.hecho { opacity: .78; }
-        .c-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .c-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; cursor: pointer; }
+        .chev { color: var(--muted-2); font-size: 16px; line-height: 1; transition: transform .2s; padding: 0 2px 4px; }
+        .card.abierta .chev { transform: rotate(180deg); padding: 4px 2px 0; }
+        .c-res { display: flex; align-items: center; gap: 8px; margin-top: 8px; cursor: pointer; }
+        .c-res .th { display: flex; gap: 3px; flex: none; }
+        .c-res img { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; background: #fff; }
+        .c-res .tx { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.35; color: var(--muted-2); overflow: hidden;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .card.abierta .c-res { display: none; }
+        .card:not(.abierta) .c-det { display: none; }
+        .card:not(.abierta) { padding-bottom: 12px; }
         .cta { font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 3px 7px; border-radius: 6px; color: #fff; }
         .cta.Mikra { background: var(--mikra); } .cta.Chaya { background: var(--chaya); }
         .nick { font-size: 15px; font-weight: 700; background: none; border: none; color: var(--text); padding: 2px 0;
@@ -602,6 +612,7 @@ function itemsHistorial(items) {
 //  LISTA
 // ══════════════════════════════════════════════════════════════════════════
 let PEND = [], HECHOS = [], TAB = 'pend', CARGANDO = false, HECHOS_CARGADOS = false;
+const ABIERTAS = new Set();      // tarjetas desplegadas (todas arrancan cerradas)
 const parseJ = (s, d) => { if (s && typeof s === 'object') return s; try { return s ? JSON.parse(s) : d; } catch (e) { return d; } };
 function normCambio(c) { return { ...c, traer: !!(+c.traer), items: parseJ(c.items, []), con: parseJ(c.con, null) }; }
 function guardarCache() { try { localStorage.setItem(CACHE_LS, JSON.stringify({ PEND, HECHOS, t: Date.now() })); } catch (e) {} }
@@ -672,11 +683,16 @@ function cardHTML(c) {
         ? `<div class="c-sub">🔀 Se cruzó con <b style="color:var(--text)">${esc(c.con.numero ? c.con.numero + ' · ' : '')}${esc(c.con.nick || c.con.comprador || '')}</b>` +
           (c.con.venta ? ` <button class="chip-cp" data-copiar="${esc(c.con.venta)}">#${esc(c.con.venta)}<i>copiar</i></button>` : '') + `</div>` : '';
     const hecho = c.estado === 'hecho';
-    return `<div class="card m-${esc(c.motivo)}${hecho ? ' hecho' : ''}" data-id="${esc(c.id)}">` +
-        `<div class="c-top">${c.cuenta ? `<span class="cta ${esc(c.cuenta)}">${esc(c.cuenta.toUpperCase())}</span>` : ''}` +
-            `<button class="nick" data-copiar="${esc(c.nick)}" title="Copiar usuario">${esc(c.nick || c.comprador || '—')}</button>` +
-            `<span class="motivo">${m.ico} ${esc(m.txt)}</span></div>` +
+    const { fotos, txt } = resumenCorto(c);
+    return `<div class="card m-${esc(c.motivo)}${hecho ? ' hecho' : ''}${ABIERTAS.has(c.id) ? ' abierta' : ''}" data-id="${esc(c.id)}">` +
+        `<div class="c-top" data-toggle="1">${c.cuenta ? `<span class="cta ${esc(c.cuenta)}">${esc(c.cuenta.toUpperCase())}</span>` : ''}` +
+            `<span class="nick">${esc(c.nick || c.comprador || '—')}</span>` +
+            `<span class="motivo">${m.ico} ${esc(m.txt)}</span><span class="chev">⌄</span></div>` +
+        // Cerrada: solo un renglón con las fotos de lo que hay que llevar
+        `<div class="c-res" data-toggle="1">${fotos.length ? `<span class="th">${fotos.map(u => `<img loading="lazy" src="${esc(u)}" alt="">`).join('')}</span>` : ''}<span class="tx">${esc(txt)}</span></div>` +
+        `<div class="c-det">` +
         `<div class="c-sub">${c.comprador ? `👤 ${esc(c.comprador)}` : ''}` +
+            (c.nick ? ` <button class="chip-cp" data-copiar="${esc(c.nick)}">@${esc(c.nick)}<i>copiar</i></button>` : '') +
             (c.venta ? ` <button class="chip-cp" data-copiar="${esc(c.venta)}">🧾 #${esc(c.venta)}<i>copiar</i></button>` : '') + `</div>` +
         con +
         (lleva.length ? `<div class="c-sec lleva"><h4>📦 Llevarle</h4>${lleva.join('')}</div>` : '') +
@@ -689,7 +705,30 @@ function cardHTML(c) {
               `<button data-acc="mover" title="Pasar a otro día">📅</button><button data-acc="editar" title="Editar">✏️</button>` +
               `<button data-acc="borrar" title="Borrar">🗑</button></div>` +
               `<div class="c-meta">Cargado ${esc(cuandoTxt(c.creado))}${c.actualizado && c.actualizado !== c.creado ? ' · editado ' + esc(cuandoTxt(c.actualizado)) : ''}</div>`) +
-        `</div>`;
+        `</div></div>`;
+}
+// Renglón de la tarjeta cerrada: fotos de lo que se lleva + qué es, en corto
+function resumenCorto(c) {
+    const its = c.items || [];
+    if (c.motivo === 'cambio') {
+        const camb = its.filter(i => i.nuevo);
+        const a = camb[0];
+        let txt = c.nota || '';
+        if (a) {          // lo importante primero: el cambio (la foto ya dice qué artículo es)
+            const nc = a.nuevo.c || a.c, nt = a.nuevo.t || a.t;
+            txt = normNom(nc) === normNom(a.c) ? `${a.c} · T: ${a.t} → ${nt}`
+                : normNom(nt) === normNom(a.t) ? `${a.c} → ${nc} · T: ${a.t}`
+                : `${a.c} ${a.t} → ${nc} ${nt}`;
+            txt += ` · ${a.n}` + (camb.length > 1 ? ` (+${camb.length - 1} más)` : '');
+        }
+        return { fotos: camb.map(i => i.nuevo.img || i.img).filter(Boolean).slice(0, 3), txt };
+    }
+    const sel = its.filter(i => i.sel);
+    let txt;
+    if (c.motivo === 'confusion') txt = `Mandarle ${sel.length ? sel.map(i => i.n).slice(0, 2).join(', ') : 'lo suyo'}` +
+        (c.con && c.con.numero ? ` · se cruzó con ${c.con.numero}` : '');
+    else txt = c.nota || sel.map(i => i.n).join(', ') || 'Ver detalle';
+    return { fotos: sel.map(i => i.img).filter(Boolean).slice(0, 3), txt };
 }
 
 function pintar() {
@@ -758,7 +797,13 @@ $('lista').addEventListener('click', async e => {
         else toast(ok ? `✓ Copiado: ${cp.dataset.copiar}` : 'No se pudo copiar', null, null, 1600);
         return;
     }
-    const b = e.target.closest('[data-acc]'), card = e.target.closest('.card');
+    const card = e.target.closest('.card');
+    if (card && e.target.closest('[data-toggle]')) {         // tocar la tarjeta → se abre / se cierra
+        const ab = card.classList.toggle('abierta');
+        if (ab) ABIERTAS.add(card.dataset.id); else ABIERTAS.delete(card.dataset.id);
+        return;
+    }
+    const b = e.target.closest('[data-acc]');
     if (!b || !card) return;
     const id = card.dataset.id, c = PEND.find(x => x.id === id) || HECHOS.find(x => x.id === id);
     if (!c) return;

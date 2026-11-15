@@ -1260,6 +1260,47 @@ async function contarMensajes(cuenta, venta) {
     MSG_ACT.set(`${cuenta}|${venta}`, !!(d && d.conversation_status && d.conversation_status.status === 'active'));
     return d ? Number((d.paging && d.paging.total) != null ? d.paging.total : (d.messages || []).length) || 0 : 0;
 }
+// ── Mandar mensajes: por la bandeja de Ecomm (los tokens de ML de las apps son solo
+// lectura), con la MISMA clave que cambiar stock (localStorage mikra_clave_stock, la que
+// ya usan Pedidos y Control de Stock en este mismo sitio). Sin clave no se manda nada.
+const ECOMM_PROXY = 'https://ecomm-token-proxy.rafaelassir.workers.dev';
+const CLAVE_STOCK_LS = 'mikra_clave_stock';
+const claveStock = () => { try { return localStorage.getItem(CLAVE_STOCK_LS) || ''; } catch (e) { return ''; } };
+const guardarClaveStock = v => { try { v ? localStorage.setItem(CLAVE_STOCK_LS, v) : localStorage.removeItem(CLAVE_STOCK_LS); } catch (e) {} };
+function pedirClaveStock(mal) {
+    return new Promise(res => {
+        const o = document.createElement('div');
+        o.className = 'sub open'; o.style.cssText = 'z-index:400;align-items:center;padding:16px';
+        o.innerHTML = `<form class="sub-in" style="border-radius:18px;max-width:360px;margin:0 auto;border:1px solid var(--border-bright)">` +
+            `<div class="sub-hd"><b>🔒 Clave para mandar mensajes</b></div>` +
+            `<div class="ayuda" style="margin:0 0 10px">${mal ? '❌ Clave incorrecta, probá de nuevo.' : 'Es la misma clave que usás para cambiar stock (Pedidos / Control de Stock). Se pide una sola vez.'}</div>` +
+            `<div class="busq"><input type="password" autocomplete="current-password" placeholder="Clave"><button class="ir">OK</button></div>` +
+            `<button type="button" class="link-btn" data-x style="margin-top:8px">Cancelar</button></form>`;
+        const inp = o.querySelector('input'), fin = v => { o.remove(); res(v); };
+        o.querySelector('[data-x]').onclick = () => fin('');
+        o.querySelector('form').onsubmit = e => { e.preventDefault(); const v = inp.value.trim(); if (!v) return; guardarClaveStock(v); fin(v); };
+        document.body.appendChild(o); setTimeout(() => inp.focus(), 60);
+    });
+}
+async function fetchConClave(url, opts = {}) {
+    for (let i = 0; i < 4; i++) {
+        if (!claveStock()) { if (!(await pedirClaveStock(i > 0))) throw new Error('Sin clave: no se mandó nada'); }
+        const k = claveStock();
+        const r = await fetchT(url, { ...opts, headers: { ...(opts.headers || {}), 'X-Clave': k } }, 30000);
+        if (r.status !== 401) return r;
+        guardarClaveStock('');                           // la rechazó: no se mandó nada → pedirla de nuevo
+        if (!(await pedirClaveStock(true))) throw new Error('Sin clave: no se mandó nada');
+    }
+    throw new Error('Clave incorrecta: no se mandó nada');
+}
+async function mandarMensajeML(cuenta, venta, texto) {
+    const r = await fetchConClave(`${ECOMM_PROXY}/ml-mensaje`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cuenta: String(cuenta || '').toLowerCase(), venta, texto }) });
+    let d = null; try { d = await r.json(); } catch (e) {}
+    if (!r.ok || !d || !d.ok) throw new Error((d && d.error) || ('respondió ' + r.status));
+    return d;
+}
+
 async function mlPost(cta, path, body) {
     for (let i = 0; i < 2; i++) {
         const { access_token } = await getToken(cta);
@@ -1342,7 +1383,7 @@ async function abrirMensajes(c) {
             `<div class="mt">${yo ? 'Nosotros' : 'Comprador'} · ${esc(fechaMsg(cuando(m)))}${visto}${mod}</div></div>`;
     };
     // Escribir: solo si ML deja (conversación activa). Si está bloqueada, se explica por qué.
-    const escribir = activa && buyerId
+    const escribir = activa
         ? `<div class="redactar"><textarea id="msgTxt" maxlength="${maxLargo}" placeholder="Escribile a ${esc(c.nick || 'el comprador')}…"></textarea>` +
           `<div class="redactar-pie"><span id="msgCont">0/${maxLargo}</span><button class="btn2 amarillo" id="msgEnviar">Enviar</button></div>` +
           `<div class="ayuda" style="margin-top:4px">Lo lee el comprador en Mercado Libre. Sin teléfonos, mails ni links (ML los bloquea).</div></div>`
@@ -1361,11 +1402,11 @@ async function abrirMensajes(c) {
             if (!confirm(`¿Mandarle este mensaje a ${c.nick || 'el comprador'}?\n\n${t}`)) return;
             const b = $('msgEnviar'); b.disabled = true; b.textContent = 'Enviando…';
             try {
-                await mlPost(cta, `/api/messages/packs/${encodeURIComponent(c.venta)}/sellers/${uid}?tag=post_sale`,
-                    { from: { user_id: uid }, to: { user_id: buyerId }, text: t });
+                await mandarMensajeML(c.cuenta, c.venta, t);                  // por Ecomm, con la clave del stock
                 toast('✓ Mensaje enviado');
                 MSG_N.set(claveMsg(c), (MSG_N.get(claveMsg(c)) || 0) + 1);
-                abrirMensajes(c);                                             // recarga la conversación con el nuevo
+                await sleep(1500);                                            // que ML lo registre antes de recargar
+                abrirMensajes(c);
                 pintar();
             } catch (err) {
                 b.disabled = false; b.textContent = 'Enviar';

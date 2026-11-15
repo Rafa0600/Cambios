@@ -243,6 +243,21 @@
             background: #24243f; color: var(--text); border: 1px solid var(--border-bright); border-radius: 14px; padding: 11px 14px;
             font-size: 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.6); max-width: 92vw; }
         .toast button { background: none; border: none; color: var(--yellow); font-weight: 700; font-size: 14px; }
+        .chat { display: flex; flex-direction: column; gap: 10px; max-height: 64dvh; overflow-y: auto; padding: 2px 2px 6px; }
+        .msg { display: flex; flex-direction: column; max-width: 86%; }
+        .msg.el { align-self: flex-start; }
+        .msg.yo { align-self: flex-end; align-items: flex-end; }
+        .burb { padding: 9px 12px; border-radius: 15px; font-size: 14.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .msg.el .burb { background: var(--surface-3); border-bottom-left-radius: 5px; }
+        .msg.yo .burb { background: rgba(255,230,0,.13); border: 1px solid rgba(255,230,0,.25); border-bottom-right-radius: 5px; }
+        .mt { font-size: 10.5px; color: var(--muted); margin: 3px 5px 0; }
+        .adj { margin-top: 4px; border: 1px solid var(--border-bright); background: var(--surface-2); color: var(--blue); border-radius: 10px;
+            padding: 7px 10px; font-size: 12.5px; text-align: left; }
+        .adj-img { margin-top: 4px; max-width: 100%; max-height: 300px; border-radius: 12px; }
+        .chat-aviso { font-size: 12.5px; color: var(--orange); background: rgba(255,170,68,.08); border: 1px solid rgba(255,170,68,.3);
+            border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+        .sel-resumen .btn2 { flex: none; }
+        .msg-n { font-size: 11.5px; font-weight: 700; color: var(--blue); background: rgba(64,196,255,.1); border-radius: 20px; padding: 3px 8px; }
         .hdr-btn.on { border-color: rgba(255,230,0,.45); }
         .banner { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; padding: 10px 12px; border-radius: 14px;
             background: rgba(255,230,0,.07); border: 1px solid rgba(255,230,0,.3); font-size: 13px; }
@@ -648,6 +663,7 @@ async function refrescar(conHechos) {
         toast('Sin conexión con la nube · muestro lo último guardado');
     } finally { CARGANDO = false; $('btnRefrescar').classList.remove('girando'); }
     pintar();
+    cargarConteos(true);         // ¿llegaron mensajes nuevos en alguna venta?
 }
 
 function pintarResumen() {
@@ -698,9 +714,12 @@ function cardHTML(c) {
           (c.con.venta ? ` <button class="chip-cp" data-copiar="${esc(c.con.venta)}">#${esc(c.con.venta)}<i>copiar</i></button>` : '') + `</div>` : '';
     const hecho = c.estado === 'hecho';
     const { fotos, txt } = resumenCorto(c);
+    const nMsg = MSG_N.get(claveMsg(c)) || 0;          // 💬 solo si la venta tiene mensajes
+    const btnMsgs = nMsg ? `<button data-acc="mensajes" title="Mensajes de la venta">💬 ${nMsg}</button>` : '';
     return `<div class="card m-${esc(c.motivo)}${hecho ? ' hecho' : ''}${ABIERTAS.has(c.id) ? ' abierta' : ''}" data-id="${esc(c.id)}">` +
         `<div class="c-top" data-toggle="1">${c.cuenta ? `<span class="cta ${esc(c.cuenta)}">${esc(c.cuenta.toUpperCase())}</span>` : ''}` +
             `<span class="nick">${esc(c.nick || c.comprador || '—')}</span>` +
+            (nMsg ? `<span class="msg-n" title="Tiene mensajes">💬 ${nMsg}</span>` : '') +
             `<span class="motivo">${m.ico} ${esc(m.txt)}</span><span class="chev">⌄</span></div>` +
         // Cerrada: solo un renglón con las fotos de lo que hay que llevar
         `<div class="c-res" data-toggle="1">${fotos.length ? `<span class="th">${fotos.map(u => `<img loading="lazy" src="${esc(u)}" alt="">`).join('')}</span>` : ''}<span class="tx">${esc(txt)}</span></div>` +
@@ -714,8 +733,8 @@ function cardHTML(c) {
         (c.nota ? `<div class="c-nota">📝 ${esc(c.nota)}</div>` : '') +
         (hecho
             ? `<div class="c-meta">✅ Hecho ${esc(cuandoTxt(c.hecho_en))} · era para el ${esc(nombreDia(c.fecha))}</div>` +
-              `<div class="c-acc"><button class="volver-btn" data-acc="volver">↩ Volver a pendientes</button></div>`
-            : `<div class="c-acc"><button class="hecho-btn" data-acc="hecho">✅ Hecho</button>` +
+              `<div class="c-acc"><button class="volver-btn" data-acc="volver">↩ Volver a pendientes</button>${btnMsgs}</div>`
+            : `<div class="c-acc"><button class="hecho-btn" data-acc="hecho">✅ Hecho</button>${btnMsgs}` +
               `<button data-acc="mover" title="Pasar a otro día">📅</button><button data-acc="editar" title="Editar">✏️</button>` +
               `<button data-acc="borrar" title="Borrar">🗑</button></div>` +
               `<div class="c-meta">Cargado ${esc(cuandoTxt(c.creado))}${c.actualizado && c.actualizado !== c.creado ? ' · editado ' + esc(cuandoTxt(c.actualizado)) : ''}</div>`) +
@@ -793,6 +812,7 @@ function reemplazar(c) {
     if (c.estado === 'hecho') HECHOS.unshift(c);
     PEND.sort((a, b) => a.fecha.localeCompare(b.fecha) || String(a.creado).localeCompare(String(b.creado)));
     guardarCache(); pintar();
+    cargarConteos(false);
 }
 async function cambiarEstado(c, estado, msg, deshacer) {
     const antes = { ...c };
@@ -828,6 +848,7 @@ $('lista').addEventListener('click', async e => {
     if (acc === 'volver') return cambiarEstado(c, 'pendiente', 'Volvió a pendientes');
     if (acc === 'borrar') { if (confirm(`¿Borrar el cambio de ${c.nick || c.comprador}?`)) cambiarEstado(c, 'borrado', '🗑 Borrado', true); return; }
     if (acc === 'editar') return abrirForm(c);
+    if (acc === 'mensajes') return abrirMensajes(c);
     if (acc === 'mover') {
         const ya = card.querySelector('.mover');
         if (ya) { ya.remove(); return; }
@@ -878,6 +899,7 @@ function pintarForm() {
     if (tieneVenta) {
         h += `<div class="sel-resumen">${F.cuenta ? `<span class="cta ${esc(F.cuenta)}">${esc(F.cuenta.toUpperCase())}</span>` : ''}` +
             `<div><b>${esc(F.nick || F.comprador)}</b><span>${F.comprador && F.nick ? esc(F.comprador) + ' · ' : ''}Venta #${esc(F.venta)}</span></div>` +
+            (MSG_N.get(claveMsg(F)) ? `<button class="btn2" id="fMsgs" title="Ver los mensajes de esta venta">💬 ${MSG_N.get(claveMsg(F))}</button>` : '') +
             (F._nuevo ? `<button class="link-btn" id="fOtra">Cambiar</button>` : '') + `</div>`;
     } else {
         h += `<div class="busq"><input id="fBusq" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Usuario, nº de venta o de envío">` +
@@ -1037,6 +1059,8 @@ function elegirCompra(k) {
     F.con = null;
     if (F.items.length === 1) F.items[0].sel = true;
     pintarForm();
+    const kMsg = claveMsg(F);
+    contarMensajes(F.cuenta, F.venta).then(n => { MSG_N.set(kMsg, n); if (F && claveMsg(F) === kMsg && n) pintarForm(); }).catch(() => {});
     $('hoja').querySelector('.hoja-bd').scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1087,6 +1111,7 @@ $('form').addEventListener('click', async e => {
     const tr = t.closest('[data-traer]'); if (tr) { F.traer = tr.dataset.traer === '1'; return pintarForm(); }
     const fe = t.closest('[data-fecha]'); if (fe) { F.fecha = fe.dataset.fecha; return pintarForm(); }
     if (t.closest('#fCon')) return abrirConQuien();
+    if (t.closest('#fMsgs')) return abrirMensajes(F);
     if (t.closest('#fConQuitar')) { F.con = null; return pintarForm(); }
 });
 
@@ -1212,6 +1237,102 @@ async function abrirConQuien() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  MENSAJES DE LA VENTA (los de ML, sin marcarlos como leídos: mark_as_read=false)
+// ══════════════════════════════════════════════════════════════════════════
+// Cuántos mensajes tiene cada venta (para mostrar 💬 SOLO si hay). cuenta|venta → número
+const MSG_N = new Map();
+const claveMsg = c => `${c.cuenta}|${c.venta}`;
+async function contarMensajes(cuenta, venta) {
+    const cta = CUENTAS.find(x => x.nombre === cuenta);
+    if (!cta || !venta) return 0;
+    const { user_id } = await getToken(cta);
+    const d = await mlGet(cta, `/api/messages/packs/${encodeURIComponent(venta)}/sellers/${user_id}?tag=post_sale&mark_as_read=false&limit=1`);
+    return d ? Number((d.paging && d.paging.total) != null ? d.paging.total : (d.messages || []).length) || 0 : 0;
+}
+let _contando = false;
+async function cargarConteos(forzar) {          // de a 3; si cambió algún número, repinta
+    if (_contando) return;
+    const lista = (TAB === 'hechos' ? HECHOS : PEND).filter(c => c.venta && c.cuenta && (forzar || !MSG_N.has(claveMsg(c))));
+    if (!lista.length) return;
+    _contando = true;
+    let cambio = false, sig = 0;
+    await Promise.all(Array.from({ length: Math.min(3, lista.length) }, async () => {
+        while (sig < lista.length) {
+            const c = lista[sig++], k = claveMsg(c);
+            try { const n = await contarMensajes(c.cuenta, c.venta); if (MSG_N.get(k) !== n) { MSG_N.set(k, n); cambio = true; } }
+            catch (e) { if (!MSG_N.has(k)) MSG_N.set(k, 0); }      // sin internet: no reintentar en cada repintada
+        }
+    }));
+    _contando = false;
+    if (cambio) pintar();
+}
+
+async function mensajesDe(cuenta, venta) {
+    const cta = CUENTAS.find(x => x.nombre === cuenta);
+    if (!cta) throw new Error('no sé de qué cuenta es esta venta');
+    const { user_id } = await getToken(cta);
+    const msgs = []; let estado = null;
+    for (let off = 0; off < 300; off += 50) {
+        const d = await mlGet(cta, `/api/messages/packs/${encodeURIComponent(venta)}/sellers/${user_id}?tag=post_sale&mark_as_read=false&limit=50&offset=${off}`);
+        if (!d) break;
+        estado = d.conversation_status || estado;
+        msgs.push(...(d.messages || []));
+        if ((d.messages || []).length < 50) break;
+    }
+    const cuando = m => (m.message_date && (m.message_date.created || m.message_date.received)) || m.date_created || '';
+    msgs.sort((a, b) => String(cuando(a)).localeCompare(String(cuando(b))));        // del más viejo al más nuevo
+    return { cta, uid: String(user_id), msgs, estado, cuando };
+}
+const fechaMsg = iso => {
+    const d = new Date(iso); if (isNaN(d)) return '';
+    const dia = d.toLocaleDateString('sv-SE', { timeZone: TZ });
+    const hora = d.toLocaleTimeString('es-AR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${relDia(dia) || `${DIAS[diaSem(dia)].slice(0, 3)} ${ddmm(dia)}`} ${hora}`;
+};
+async function abrirMensajes(c) {
+    const hd = `<div class="sub-hd"><b>💬 ${esc(c.nick || c.comprador || '')}</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+        `<div class="ayuda" style="margin:-4px 0 10px">${esc(c.cuenta || '')} · venta #${esc(c.venta)} · no se marcan como leídos</div>`;
+    $('subIn').innerHTML = hd + '<div class="cargando">Cargando mensajes…</div>';
+    $('sub').classList.add('open');
+    let r;
+    try { r = await mensajesDe(c.cuenta, c.venta); }
+    catch (e) { $('subIn').innerHTML = hd + `<div class="error">😕 No pude traer los mensajes: ${esc(e.message || e)}</div>`; return; }
+    const { cta, uid, msgs, estado, cuando } = r;
+    MSG_N.set(claveMsg(c), msgs.length);
+    const bloq = msgs.length && estado && estado.status && estado.status !== 'active'
+        ? `<div class="chat-aviso">🔒 Mercado Libre tiene esta conversación <b>${esc(estado.status === 'blocked' ? 'bloqueada' : estado.status)}</b>` +
+          (estado.substatus ? ` (${esc(estado.substatus)})` : '') + ': no se pueden mandar mensajes nuevos.</div>' : '';
+    const burbujas = msgs.map(m => {
+        const yo = String((m.from || {}).user_id) === uid;
+        const md = m.message_date || {};
+        const adj = (m.message_attachments || []).map(a =>
+            `<button class="adj" data-adj="${esc(a.filename)}" data-tipo="${esc(a.type || '')}">📎 ${esc(a.original_filename || 'Adjunto')} · ver</button>`).join('');
+        const mod = m.message_moderation && m.message_moderation.status && !['clean', 'non_moderated'].includes(m.message_moderation.status)
+            ? ' · ⚠️ moderado por ML' : '';
+        const visto = yo ? (md.read ? ' · ✓✓ lo leyó' : ' · enviado') : '';
+        return `<div class="msg ${yo ? 'yo' : 'el'}">${m.text ? `<div class="burb">${esc(m.text)}</div>` : ''}${adj}` +
+            `<div class="mt">${yo ? 'Nosotros' : 'Comprador'} · ${esc(fechaMsg(cuando(m)))}${visto}${mod}</div></div>`;
+    }).join('');
+    $('subIn').innerHTML = hd + bloq + (msgs.length ? `<div class="chat" id="chat">${burbujas}</div>`
+        : `<div class="vacio" style="padding:28px 10px"><big>💬</big>No hay mensajes en esta venta.</div>`);
+    const ch = $('chat'); if (ch) ch.scrollTop = ch.scrollHeight;          // abre en el último
+    // Adjuntos (fotos que manda el comprador): se bajan con el permiso de la cuenta
+    $('subIn').onclick = async e => {
+        const b = e.target.closest('[data-adj]'); if (!b) return;
+        b.disabled = true; b.textContent = '📎 Bajando…';
+        try {
+            const { access_token } = await getToken(cta);
+            const resp = await fetchT(`${cta.proxy}/api/messages/attachments/${encodeURIComponent(b.dataset.adj)}?tag=post_sale&site_id=MLA`,
+                { headers: { Authorization: `Bearer ${access_token}` } }, 30000);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const blob = await resp.blob(), url = URL.createObjectURL(blob);
+            if (/^image\//.test(blob.type)) { const img = document.createElement('img'); img.src = url; img.className = 'adj-img'; b.replaceWith(img); }
+            else { window.open(url, '_blank'); b.textContent = '📎 Abierto'; }
+        } catch (err) { b.textContent = '📎 No se pudo bajar (miralo en ML)'; }
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  AVISOS AL CELULAR (lun–vie 10:00 los de hoy · 13:00 los que quedan)
 //  El celu se anota en la nube (push_subs) y el Worker manda el aviso a esa hora.
 // ══════════════════════════════════════════════════════════════════════════
@@ -1305,6 +1426,7 @@ function cambiarTab(t) {
     TAB = t;
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
     pintar();
+    cargarConteos(false);
     if (t === 'hechos' && !HECHOS_CARGADOS) refrescar(true);
 }
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => cambiarTab(b.dataset.tab));

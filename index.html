@@ -257,6 +257,13 @@
         .chat-aviso { font-size: 12.5px; color: var(--orange); background: rgba(255,170,68,.08); border: 1px solid rgba(255,170,68,.3);
             border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
         .sel-resumen .btn2 { flex: none; }
+        .redactar { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .redactar textarea { width: 100%; min-height: 70px; max-height: 160px; border-radius: 12px; border: 1px solid var(--border-bright);
+            background: var(--surface-2); color: var(--text); padding: 10px 12px; font-size: 15px; outline: none; resize: vertical; }
+        .redactar textarea:focus { border-color: var(--yellow); }
+        .redactar-pie { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+        .redactar-pie span { font-size: 11.5px; color: var(--muted); font-family: 'Space Mono', monospace; }
+        .redactar-pie .btn2 { height: 42px; padding: 0 22px; font-size: 15px; }
         .msg-n { font-size: 11.5px; font-weight: 700; color: var(--blue); background: rgba(64,196,255,.1); border-radius: 20px; padding: 3px 8px; }
         .hdr-btn.on { border-color: rgba(255,230,0,.45); }
         .banner { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; padding: 10px 12px; border-radius: 14px;
@@ -711,11 +718,12 @@ function cardHTML(c) {
     const { lleva, retira, retiraTxt } = llevaRetira(c);
     const con = c.motivo === 'confusion' && c.con
         ? `<div class="c-sub">🔀 Se cruzó con <b style="color:var(--text)">${esc(c.con.numero ? c.con.numero + ' · ' : '')}${esc(c.con.nick || c.con.comprador || '')}</b>` +
-          (c.con.venta ? ` <button class="chip-cp" data-copiar="${esc(c.con.venta)}">#${esc(c.con.venta)}<i>copiar</i></button>` : '') + `</div>` : '';
+          (c.con.venta ? ` <button class="chip-cp" data-copiar="${esc(c.con.venta)}">#${esc(c.con.venta)}</button>` : '') + `</div>` : '';
     const hecho = c.estado === 'hecho';
     const { fotos, txt } = resumenCorto(c);
     const nMsg = MSG_N.get(claveMsg(c)) || 0;          // 💬 solo si la venta tiene mensajes
-    const btnMsgs = nMsg ? `<button data-acc="mensajes" title="Mensajes de la venta">💬 ${nMsg}</button>` : '';
+    const btnMsgs = nMsg ? `<button data-acc="mensajes" title="Mensajes de la venta">💬 ${nMsg}</button>`
+        : MSG_ACT.get(claveMsg(c)) ? `<button data-acc="mensajes" title="Escribirle al comprador">✍️</button>` : '';
     return `<div class="card m-${esc(c.motivo)}${hecho ? ' hecho' : ''}${ABIERTAS.has(c.id) ? ' abierta' : ''}" data-id="${esc(c.id)}">` +
         `<div class="c-top" data-toggle="1">${c.cuenta ? `<span class="cta ${esc(c.cuenta)}">${esc(c.cuenta.toUpperCase())}</span>` : ''}` +
             `<span class="nick">${esc(c.nick || c.comprador || '—')}</span>` +
@@ -725,8 +733,8 @@ function cardHTML(c) {
         `<div class="c-res" data-toggle="1">${fotos.length ? `<span class="th">${fotos.map(u => `<img loading="lazy" src="${esc(u)}" alt="">`).join('')}</span>` : ''}<span class="tx">${esc(txt)}</span></div>` +
         `<div class="c-det">` +
         `<div class="c-sub">${c.comprador ? `👤 ${esc(c.comprador)}` : ''}` +
-            (c.nick ? ` <button class="chip-cp" data-copiar="${esc(c.nick)}">@${esc(c.nick)}<i>copiar</i></button>` : '') +
-            (c.venta ? ` <button class="chip-cp" data-copiar="${esc(c.venta)}">🧾 #${esc(c.venta)}<i>copiar</i></button>` : '') + `</div>` +
+            (c.nick ? ` <button class="chip-cp" data-copiar="${esc(c.nick)}">@${esc(c.nick)}</button>` : '') +
+            (c.venta ? ` <button class="chip-cp" data-copiar="${esc(c.venta)}">🧾 #${esc(c.venta)}</button>` : '') + `</div>` +
         con +
         (lleva.length ? `<div class="c-sec lleva"><h4>📦 Llevarle</h4>${lleva.join('')}</div>` : '') +
         (retira.length || retiraTxt ? `<div class="c-sec retira"><h4>↩ Retirar</h4>${retira.join('') || `<div class="ayuda">${esc(retiraTxt)}</div>`}</div>` : '') +
@@ -825,10 +833,10 @@ async function cambiarEstado(c, estado, msg, deshacer) {
 $('lista').addEventListener('click', async e => {
     const cp = e.target.closest('[data-copiar]');
     if (cp) {
-        const ok = await copiar(cp.dataset.copiar);
-        const i = cp.querySelector('i');
-        if (i) { const a = i.textContent; i.textContent = ok ? '✓ copiado' : 'no se pudo'; cp.classList.toggle('ok', ok); setTimeout(() => { i.textContent = a; cp.classList.remove('ok'); }, 1500); }
-        else toast(ok ? `✓ Copiado: ${cp.dataset.copiar}` : 'No se pudo copiar', null, null, 1600);
+        const ok = await copiar(cp.dataset.copiar);          // tocar = copiar (sin cartelito "copiar")
+        cp.classList.toggle('ok', ok);
+        setTimeout(() => cp.classList.remove('ok'), 1200);
+        toast(ok ? `✓ Copiado: ${cp.dataset.copiar}` : 'No se pudo copiar', null, null, 1600);
         return;
     }
     if (e.target.closest('[data-avisos]')) return abrirAvisos();
@@ -899,7 +907,8 @@ function pintarForm() {
     if (tieneVenta) {
         h += `<div class="sel-resumen">${F.cuenta ? `<span class="cta ${esc(F.cuenta)}">${esc(F.cuenta.toUpperCase())}</span>` : ''}` +
             `<div><b>${esc(F.nick || F.comprador)}</b><span>${F.comprador && F.nick ? esc(F.comprador) + ' · ' : ''}Venta #${esc(F.venta)}</span></div>` +
-            (MSG_N.get(claveMsg(F)) ? `<button class="btn2" id="fMsgs" title="Ver los mensajes de esta venta">💬 ${MSG_N.get(claveMsg(F))}</button>` : '') +
+            (MSG_N.get(claveMsg(F)) ? `<button class="btn2" id="fMsgs" title="Ver los mensajes de esta venta">💬 ${MSG_N.get(claveMsg(F))}</button>`
+                : MSG_ACT.get(claveMsg(F)) ? `<button class="btn2" id="fMsgs" title="Escribirle al comprador">✍️</button>` : '') +
             (F._nuevo ? `<button class="link-btn" id="fOtra">Cambiar</button>` : '') + `</div>`;
     } else {
         h += `<div class="busq"><input id="fBusq" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Usuario, nº de venta o de envío">` +
@@ -1060,7 +1069,7 @@ function elegirCompra(k) {
     if (F.items.length === 1) F.items[0].sel = true;
     pintarForm();
     const kMsg = claveMsg(F);
-    contarMensajes(F.cuenta, F.venta).then(n => { MSG_N.set(kMsg, n); if (F && claveMsg(F) === kMsg && n) pintarForm(); }).catch(() => {});
+    contarMensajes(F.cuenta, F.venta).then(n => { MSG_N.set(kMsg, n); if (F && claveMsg(F) === kMsg && (n || MSG_ACT.get(kMsg))) pintarForm(); }).catch(() => {});
     $('hoja').querySelector('.hoja-bd').scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1241,13 +1250,26 @@ async function abrirConQuien() {
 // ══════════════════════════════════════════════════════════════════════════
 // Cuántos mensajes tiene cada venta (para mostrar 💬 SOLO si hay). cuenta|venta → número
 const MSG_N = new Map();
+const MSG_ACT = new Map();      // cuenta|venta → true si ML deja escribir (conversación activa)
 const claveMsg = c => `${c.cuenta}|${c.venta}`;
 async function contarMensajes(cuenta, venta) {
     const cta = CUENTAS.find(x => x.nombre === cuenta);
     if (!cta || !venta) return 0;
     const { user_id } = await getToken(cta);
     const d = await mlGet(cta, `/api/messages/packs/${encodeURIComponent(venta)}/sellers/${user_id}?tag=post_sale&mark_as_read=false&limit=1`);
+    MSG_ACT.set(`${cuenta}|${venta}`, !!(d && d.conversation_status && d.conversation_status.status === 'active'));
     return d ? Number((d.paging && d.paging.total) != null ? d.paging.total : (d.messages || []).length) || 0 : 0;
+}
+async function mlPost(cta, path, body) {
+    for (let i = 0; i < 2; i++) {
+        const { access_token } = await getToken(cta);
+        const r = await fetchT(`${cta.proxy}${path}`, { method: 'POST', cache: 'no-store',
+            headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 20000);
+        if (r.status === 401 && i === 0) { tokens.del(cta.proxy); continue; }
+        let d = null; try { d = await r.json(); } catch (e) {}
+        if (!r.ok) throw new Error((d && (d.message || d.error)) || ('ML respondió ' + r.status));
+        return d;
+    }
 }
 let _contando = false;
 async function cargarConteos(forzar) {          // de a 3; si cambió algún número, repinta
@@ -1259,7 +1281,10 @@ async function cargarConteos(forzar) {          // de a 3; si cambió algún nú
     await Promise.all(Array.from({ length: Math.min(3, lista.length) }, async () => {
         while (sig < lista.length) {
             const c = lista[sig++], k = claveMsg(c);
-            try { const n = await contarMensajes(c.cuenta, c.venta); if (MSG_N.get(k) !== n) { MSG_N.set(k, n); cambio = true; } }
+            try {
+                const actAntes = MSG_ACT.get(k), n = await contarMensajes(c.cuenta, c.venta);
+                if (MSG_N.get(k) !== n || MSG_ACT.get(k) !== actAntes) { MSG_N.set(k, n); cambio = true; }
+            }
             catch (e) { if (!MSG_N.has(k)) MSG_N.set(k, 0); }      // sin internet: no reintentar en cada repintada
         }
     }));
@@ -1271,17 +1296,18 @@ async function mensajesDe(cuenta, venta) {
     const cta = CUENTAS.find(x => x.nombre === cuenta);
     if (!cta) throw new Error('no sé de qué cuenta es esta venta');
     const { user_id } = await getToken(cta);
-    const msgs = []; let estado = null;
+    const msgs = []; let estado = null, maxLargo = 0;
     for (let off = 0; off < 300; off += 50) {
         const d = await mlGet(cta, `/api/messages/packs/${encodeURIComponent(venta)}/sellers/${user_id}?tag=post_sale&mark_as_read=false&limit=50&offset=${off}`);
         if (!d) break;
         estado = d.conversation_status || estado;
+        maxLargo = d.seller_max_message_length || maxLargo;
         msgs.push(...(d.messages || []));
         if ((d.messages || []).length < 50) break;
     }
     const cuando = m => (m.message_date && (m.message_date.created || m.message_date.received)) || m.date_created || '';
     msgs.sort((a, b) => String(cuando(a)).localeCompare(String(cuando(b))));        // del más viejo al más nuevo
-    return { cta, uid: String(user_id), msgs, estado, cuando };
+    return { cta, uid: String(user_id), msgs, estado, cuando, maxLargo: maxLargo || 350 };
 }
 const fechaMsg = iso => {
     const d = new Date(iso); if (isNaN(d)) return '';
@@ -1297,12 +1323,14 @@ async function abrirMensajes(c) {
     let r;
     try { r = await mensajesDe(c.cuenta, c.venta); }
     catch (e) { $('subIn').innerHTML = hd + `<div class="error">😕 No pude traer los mensajes: ${esc(e.message || e)}</div>`; return; }
-    const { cta, uid, msgs, estado, cuando } = r;
+    const { cta, uid, msgs, estado, cuando, maxLargo } = r;
     MSG_N.set(claveMsg(c), msgs.length);
-    const bloq = msgs.length && estado && estado.status && estado.status !== 'active'
-        ? `<div class="chat-aviso">🔒 Mercado Libre tiene esta conversación <b>${esc(estado.status === 'blocked' ? 'bloqueada' : estado.status)}</b>` +
-          (estado.substatus ? ` (${esc(estado.substatus)})` : '') + ': no se pueden mandar mensajes nuevos.</div>' : '';
-    const burbujas = msgs.map(m => {
+    const activa = !!(estado && estado.status === 'active');
+    MSG_ACT.set(claveMsg(c), activa);
+    // El comprador: el que está guardado en el cambio, o el "otro" de la conversación
+    const otro = msgs.map(m => String((m.from || {}).user_id) === uid ? (m.to || {}).user_id : (m.from || {}).user_id).find(Boolean);
+    const buyerId = String(c.buyer_id || otro || '');
+    const burbuja = m => {
         const yo = String((m.from || {}).user_id) === uid;
         const md = m.message_date || {};
         const adj = (m.message_attachments || []).map(a =>
@@ -1312,18 +1340,46 @@ async function abrirMensajes(c) {
         const visto = yo ? (md.read ? ' · ✓✓ lo leyó' : ' · enviado') : '';
         return `<div class="msg ${yo ? 'yo' : 'el'}">${m.text ? `<div class="burb">${esc(m.text)}</div>` : ''}${adj}` +
             `<div class="mt">${yo ? 'Nosotros' : 'Comprador'} · ${esc(fechaMsg(cuando(m)))}${visto}${mod}</div></div>`;
-    }).join('');
-    $('subIn').innerHTML = hd + bloq + (msgs.length ? `<div class="chat" id="chat">${burbujas}</div>`
-        : `<div class="vacio" style="padding:28px 10px"><big>💬</big>No hay mensajes en esta venta.</div>`);
+    };
+    // Escribir: solo si ML deja (conversación activa). Si está bloqueada, se explica por qué.
+    const escribir = activa && buyerId
+        ? `<div class="redactar"><textarea id="msgTxt" maxlength="${maxLargo}" placeholder="Escribile a ${esc(c.nick || 'el comprador')}…"></textarea>` +
+          `<div class="redactar-pie"><span id="msgCont">0/${maxLargo}</span><button class="btn2 amarillo" id="msgEnviar">Enviar</button></div>` +
+          `<div class="ayuda" style="margin-top:4px">Lo lee el comprador en Mercado Libre. Sin teléfonos, mails ni links (ML los bloquea).</div></div>`
+        : `<div class="chat-aviso">🔒 ${estado && estado.substatus && /initiated_by_seller/.test(estado.substatus)
+            ? 'Mercado Libre no deja escribirle hasta que el comprador mande un mensaje.'
+            : 'Mercado Libre no deja mandar mensajes en esta venta.'}</div>`;
+    $('subIn').innerHTML = hd + (msgs.length ? `<div class="chat" id="chat">${msgs.map(burbuja).join('')}</div>`
+        : `<div class="vacio" style="padding:22px 10px"><big>💬</big>No hay mensajes en esta venta.</div>`) + escribir;
     const ch = $('chat'); if (ch) ch.scrollTop = ch.scrollHeight;          // abre en el último
-    // Adjuntos (fotos que manda el comprador): se bajan con el permiso de la cuenta
+    const txt = $('msgTxt');
+    if (txt) txt.oninput = () => { $('msgCont').textContent = `${txt.value.length}/${maxLargo}`; };
     $('subIn').onclick = async e => {
+        if (e.target.closest('#msgEnviar')) {                                 // mandar el mensaje
+            const t = (txt.value || '').trim();
+            if (!t) return toast('Escribí el mensaje');
+            if (!confirm(`¿Mandarle este mensaje a ${c.nick || 'el comprador'}?\n\n${t}`)) return;
+            const b = $('msgEnviar'); b.disabled = true; b.textContent = 'Enviando…';
+            try {
+                await mlPost(cta, `/api/messages/packs/${encodeURIComponent(c.venta)}/sellers/${uid}?tag=post_sale`,
+                    { from: { user_id: uid }, to: { user_id: buyerId }, text: t });
+                toast('✓ Mensaje enviado');
+                MSG_N.set(claveMsg(c), (MSG_N.get(claveMsg(c)) || 0) + 1);
+                abrirMensajes(c);                                             // recarga la conversación con el nuevo
+                pintar();
+            } catch (err) {
+                b.disabled = false; b.textContent = 'Enviar';
+                toast('No se pudo mandar: ' + (err.message || err), null, null, 6000);
+            }
+            return;
+        }
+        // Adjuntos (fotos que manda el comprador): se bajan con el permiso de la cuenta
         const b = e.target.closest('[data-adj]'); if (!b) return;
         b.disabled = true; b.textContent = '📎 Bajando…';
         try {
-            const { access_token } = await getToken(cta);
-            const resp = await fetchT(`${cta.proxy}/api/messages/attachments/${encodeURIComponent(b.dataset.adj)}?tag=post_sale&site_id=MLA`,
-                { headers: { Authorization: `Bearer ${access_token}` } }, 30000);
+            const { access_token } = await getToken(cta);      // por la nube: el proxy rompe las fotos
+            const resp = await fetchT(`${HIST_URL}/api/adjunto?f=${encodeURIComponent(b.dataset.adj)}`,
+                { headers: { 'X-Clave': clave(), 'X-ML-Token': access_token } }, 30000);
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const blob = await resp.blob(), url = URL.createObjectURL(blob);
             if (/^image\//.test(blob.type)) { const img = document.createElement('img'); img.src = url; img.className = 'adj-img'; b.replaceWith(img); }

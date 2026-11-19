@@ -105,6 +105,11 @@
         .it-tx span em { font-style: normal; color: var(--text); font-weight: 600; }
         .it-tx .tl { color: var(--yellow); font-weight: 700; }
         .it-tx .antes-tx { font-size: 11.5px; color: var(--muted); }
+        .desc-ok { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: var(--green); background: rgba(0,230,118,.08);
+            border: 1px solid rgba(0,230,118,.3); border-radius: 7px; padding: 2px 7px; line-height: 1.35; }
+        .desc-ok strong { font-family: 'Space Mono', monospace; font-size: 12.5px; }
+        .desc-ok i { font-style: normal; font-weight: 500; color: var(--muted); font-size: 10.5px; margin-left: 3px; }
+        .desc-ok.mal { color: var(--orange); background: rgba(255,170,68,.08); border-color: rgba(255,170,68,.4); }
         .it .q { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 14px; color: var(--muted-2); padding-right: 4px; }
         .c-nota { margin-top: 8px; font-size: 13px; background: rgba(255,230,0,.06); border: 1px dashed rgba(255,230,0,.25);
             border-radius: 10px; padding: 7px 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -189,6 +194,10 @@
         .btn2.on { border-color: var(--green); color: var(--green); background: rgba(0,230,118,.08); }
         .btn2.amarillo { border-color: rgba(255,230,0,.5); color: var(--yellow); }
         .nuevo-tag { font-size: 13px; color: var(--green); font-weight: 700; }
+        .cant { display: flex; width: 100%; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-2); }
+        .cant .btn2 { width: 38px; padding: 0; font-size: 18px; font-weight: 800; }
+        .cant .btn2:disabled { opacity: .35; }
+        .cant b { font-family: 'Space Mono', monospace; font-size: 15px; color: var(--yellow); }
         .toggle { display: flex; background: var(--surface-2); border: 1px solid var(--border-bright); border-radius: 12px; padding: 3px; }
         .toggle button { flex: 1; height: 42px; border: none; border-radius: 9px; background: none; color: var(--muted-2); font-weight: 700; font-size: 14px; }
         .toggle button.on { background: var(--surface-3); color: var(--text); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset; }
@@ -738,10 +747,21 @@ function pintarResumen() {
         `<div class="res-box"><b>${PEND.length}</b><span>pendientes</span></div>`;
 }
 
-function itemHTML(f, extra) {
+function itemHTML(f, extra, pie) {
     const foto = f.img ? `<img loading="lazy" src="${esc(f.img)}" alt="">` : '<div class="sinf">👕</div>';
-    return `<div class="it">${foto}<div class="it-tx"><b>${esc(f.n)}</b><span>${extra || ((f.c ? `<em>${esc(f.c)}</em>` : '') + (f.t ? ` · T: <span class="tl">${esc(f.t)}</span>` : ''))}</span></div>` +
+    return `<div class="it">${foto}<div class="it-tx"><b>${esc(f.n)}</b><span>${extra || ((f.c ? `<em>${esc(f.c)}</em>` : '') + (f.t ? ` · T: <span class="tl">${esc(f.t)}</span>` : ''))}</span>${pie || ''}</div>` +
         ((+f.q || 1) > 1 ? `<span class="q">×${+f.q}</span>` : '') + `</div>`;
+}
+// Debajo de cada artículo que se lleva: si ya se descontó de Ecom y cuánto quedó
+function pieDesc(c, sku) {
+    const d = c.extra && c.extra.desc; if (!d || !sku) return '';
+    const ok = (d.items || []).find(i => i.ok && String(i.sku) === String(sku));
+    if (ok) {
+        const quedo = ok.despues !== undefined && ok.despues !== null && ok.despues !== '' ? ` · quedó <strong>${esc(ok.despues)}</strong>` : '';
+        return `<div class="desc-ok" title="Descontado ${esc(cuandoTxt(d.at))}">✓ Descontado de Ecom −${+ok.q || 1}${quedo} <i>SKU ${esc(sku)}</i></div>`;
+    }
+    const mal = (d.errores || []).find(i => String(i.sku) === String(sku));
+    return mal ? `<div class="desc-ok mal">⚠️ No se descontó de Ecom${mal.error ? ': ' + esc(mal.error) : ''} <i>SKU ${esc(sku)}</i></div>` : '';
 }
 // Qué llevarle y qué retirarle, según el motivo
 function llevaRetira(c) {
@@ -753,11 +773,11 @@ function llevaRetira(c) {
             const nv = i.nuevo;
             const tx = `<em>${esc(nv.c || i.c)}</em> · T: <span class="tl">${esc(nv.t || i.t)}</span>` +
                 (!c.traer ? `<br><span class="antes-tx">en vez de ${esc([nv.n && nv.n !== i.n ? i.n : '', i.c, i.t].filter(Boolean).join(' · '))}</span>` : '');
-            return itemHTML({ n: nv.n || i.n, img: nv.img || i.img, q: i.q }, tx);
+            return itemHTML({ n: nv.n || i.n, img: nv.img || i.img, q: i.q }, tx, pieDesc(c, nv.sku));
         });
         if (c.traer) retira = camb.map(i => itemHTML(i));
     } else {
-        lleva = sel.map(i => itemHTML(i));
+        lleva = sel.map(i => itemHTML(i, '', pieDesc(c, i.sku)));
         if (c.traer) {
             if (c.motivo === 'confusion') {
                 if (c.con && c.con.items && c.con.items.length) retira = c.con.items.map(i => itemHTML(i));
@@ -836,8 +856,9 @@ function estadoExtraHTML(c) {
     const x = c.extra || {}, out = [];
     if (x.caso) out.push(`<span class="ok-chip">🏷️ Caso ${esc(x.caso.id)}${x.caso.impreso ? ' · impresa' : ''}</span>`);
     if (x.desc && (x.desc.items || []).some(i => i.ok)) {
-        const ok = x.desc.items.filter(i => i.ok);
-        out.push(`<span class="ok-chip">➖ Descontado de Ecom ${esc(cuandoTxt(x.desc.at))}: ${ok.map(i => `${esc(i.sku)} −${i.q}`).join(', ')}</span>`);
+        const enLleva = new Set(loQueSale(c).map(i => String(i.sku)));
+        const sueltos = x.desc.items.filter(i => i.ok && !enLleva.has(String(i.sku)));
+        if (sueltos.length) out.push(`<span class="ok-chip">➖ Descontado de Ecom ${esc(cuandoTxt(x.desc.at))}: ${sueltos.map(i => { const e = CAT && CAT.bySku[i.sku]; return `${esc(e ? [e.titulo, e.color, e.talle].filter(Boolean).join(' ') : 'SKU ' + i.sku)} −${i.q}${i.despues != null ? ' (quedó ' + esc(i.despues) + ')' : ''}`; }).join(', ')}</span>`);
     }
     return out.length ? `<div class="c-extra">${out.join('')}</div>` : '';
 }
@@ -1071,7 +1092,10 @@ function pintarForm() {
             } else {
                 acc = `<button class="btn2${it.sel ? ' on' : ''}" data-sel="${k}">${it.sel ? '✓ ' : ''}${selTxt[F.motivo] || 'Es este'}</button>`;
             }
-            return `<div class="art${on ? ' on' : ''}">${itemHTML(it)}<div class="art-acc">${acc}</div></div>`;
+            const tot = Math.max(+it.qt || 0, +it.q || 1), q = +it.q || 1;
+            const cant = tot > 1 ? `<span class="cant">${CON_NUEVO.has(F.motivo) ? '¿Cuántas cambia?' : '¿Cuántas?'}<button class="btn2" data-qm="${k}" ${q <= 1 ? 'disabled' : ''}>−</button>` +
+                `<span><b>${q}</b> de ${tot}</span><button class="btn2" data-qp="${k}" ${q >= tot ? 'disabled' : ''}>+</button></span>` : '';
+            return `<div class="art${on ? ' on' : ''}">${itemHTML(it)}<div class="art-acc">${cant}${acc}</div></div>`;
         }).join('') || '<div class="ayuda">No pude leer los artículos de esta compra (contalo en la nota).</div>';
         if (F.motivo === 'otracosa') {                       // lo que le llegó (nunca lo compró): es lo que se retira
             const rec = (F.con && F.con.items) || [];
@@ -1206,7 +1230,7 @@ function elegirCompra(k) {
     F.comprador = ra.receiver_name || '';
     F.venta = v.key;
     F.envio = v.ship ? String(v.ship.id) : '';
-    F.items = articulosDe(v.orders).map(i => ({ ...i, sel: false, nuevo: null }));
+    F.items = articulosDe(v.orders).map(i => ({ ...i, qt: i.q, ...(i.qv ? { qvt: i.qv } : {}), sel: false, nuevo: null }));
     F.con = null;
     if (F.items.length === 1) F.items[0].sel = true;
     pintarForm();
@@ -1259,6 +1283,15 @@ $('form').addEventListener('click', async e => {
         return pintarForm();
     }
     const sl = t.closest('[data-sel]'); if (sl) { const it = F.items[+sl.dataset.sel]; it.sel = !it.sel; return pintarForm(); }
+    const qb = t.closest('[data-qm], [data-qp]');           // cuántas cambia (de las que compró)
+    if (qb && !qb.disabled) {
+        const menos = qb.dataset.qm != null, it = F.items[+(menos ? qb.dataset.qm : qb.dataset.qp)];
+        const tot = Math.max(+it.qt || 0, +it.q || 1);
+        if (!it.qt) it.qt = tot;
+        it.q = Math.min(tot, Math.max(1, (+it.q || 1) + (menos ? -1 : 1)));
+        if (it.qvt) it.qv = Math.max(1, Math.round(it.qvt * it.q / tot));   // "Pack X2" fuera de la tabla: unidades vendidas
+        return pintarForm();
+    }
     const el = t.closest('[data-elegir]'); if (el) return abrirPicker(+el.dataset.elegir);
     const qu = t.closest('[data-quitar]'); if (qu) { F.items[+qu.dataset.quitar].nuevo = null; return pintarForm(); }
     const tr = t.closest('[data-traer]'); if (tr) { F.traer = tr.dataset.traer === '1'; return pintarForm(); }
@@ -1277,6 +1310,8 @@ $('btnGuardar').onclick = async () => {
     datos.items = (datos.items || []).map(i => {
         const o = { sku: i.sku || '', n: i.n, c: i.c || '', t: i.t || '', img: i.img || '', q: +i.q || 1 };
         if (i.qv) o.qv = +i.qv;
+        if (+i.qt > 1) o.qt = +i.qt;
+        if (+i.qvt) o.qvt = +i.qvt;
         if (i.sel) o.sel = true;
         if (i.nuevo) o.nuevo = i.nuevo;
         return o;
@@ -1487,8 +1522,6 @@ async function descuentoEcomCore(c) {
     const prev = ((x.desc && x.desc.items) || []).filter(i => i.ok);
     return { extra: { ...x, desc: { at: ahoraARiso(), items: [...prev, ...okN], errores: mal } }, okN, mal };
 }
-const txtDesc = (okN, mal) => (okN.length ? `${okN.map(i => `${i.sku} ${i.antes}→${i.despues}`).join(', ')}` : '') +
-    (mal.length ? `${okN.length ? ' · ' : ''}⚠️ no se pudo: ${mal.map(i => `${i.sku} (${i.error})`).join(', ')}` : '');
 async function descontarEcom(c, btn) {
     const x = c.extra || {};
     const ya = new Set(((x.desc && x.desc.items) || []).filter(i => i.ok).map(i => i.sku));
@@ -1499,12 +1532,21 @@ async function descontarEcom(c, btn) {
         (sinSku.length ? `\n\n(sin SKU, no se descuenta: ${sinSku.map(i => i.n).join(', ')})` : '') +
         `\n\nQueda como "Ajuste manual" (sale en Movimientos para el Excel). Lo que retira NO se suma: entra cuando llegue.`)) return;
     if (btn) { btn.disabled = true; btn.textContent = '➖ …'; }
+    const R = cartelPasos(`➖ Ecom · ${c.nick || c.comprador || ''}`);
+    R.paso('ecom', '⏳', 'Descontando de Ecom…');
     let r;
     try { r = await descuentoEcomCore(c); }
-    catch (e) { if (btn) { btn.disabled = false; btn.textContent = '➖ Ecom'; } return toast('No se pudo descontar: ' + (e.message || e), null, null, 6000); }
+    catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = '➖ Ecom'; }
+        R.paso('ecom', '❌', 'No se pudo descontar de Ecom', esc(e.message || String(e))); R.fin('No se descontó nada.'); return;
+    }
+    pasosEcom(R, c, r);
     try { reemplazar(await guardarEnNube({ ...c, extra: r.extra })); }
-    catch (e) { c.extra = r.extra; reemplazar(c); toast('⚠️ Se descontó pero no se guardó la marca en la nube (no lo vuelvas a descontar)', null, null, 8000); return; }
-    toast((r.okN.length ? '➖ Descontado de Ecom: ' : '⚠️ No se descontó: ') + txtDesc(r.okN, r.mal), null, null, 8000);
+    catch (e) {
+        c.extra = r.extra; reemplazar(c);
+        if (r.okN.length) R.paso('nube', '⚠️', 'No se guardó en la nube', 'Se descontó pero no quedó la marca: NO lo vuelvas a descontar.');
+    }
+    R.fin('');
 }
 
 // ── Compartir por WhatsApp (para registrarlo a mano si hace falta): lo que sale, en negativo ──
@@ -1765,6 +1807,7 @@ function cartelPasos(titulo) {
             r.className = 'cartel-fila ' + (ico === '✅' ? 'ok' : /[⏳🖨]/u.test(ico) ? 'esp' : 'mal');
             r.innerHTML = `<span class="cartel-ico">${ico}</span><div><b>${esc(txt)}</b>${det ? `<small>${det}</small>` : ''}</div>`;
         },
+        quitar(k) { if (filas[k]) { filas[k].remove(); delete filas[k]; } },
         fin(pie, alCerrar) {
             o.querySelector('.cartel-pie').innerHTML = pie || '';
             const b = o.querySelector('.cartel-ok'); b.disabled = false; b.textContent = 'OK';
@@ -1772,7 +1815,18 @@ function cartelPasos(titulo) {
         }
     };
 }
-const nomItem = i => [i.n, i.c, i.t ? 'T: ' + i.t : ''].filter(Boolean).join(' · ');
+// Resultado de Ecom en el cartel: un renglón por artículo (qué es, talle, −n y cuánto quedó)
+function pasosEcom(R, c, res) {
+    R.quitar('ecom');
+    const sale = loQueSale(c), de = sku => sale.find(i => String(i.sku) === String(sku)) || { n: 'SKU ' + sku };
+    const ct = i => esc([i.c, i.t ? 'T: ' + i.t : ''].filter(Boolean).join(' · '));
+    if (res.nada) R.paso('ecom', '✅', 'Ecom: ya estaba descontado');
+    res.okN.forEach(i => { const a = de(i.sku); R.paso('ecom-' + i.sku, '✅', a.n,
+        `${ct(a)}<br>Ecom −${+i.q || 1} · quedó <b>${esc(i.despues)}</b> <span class="cartel-sku">(antes ${esc(i.antes)} · SKU ${esc(i.sku)})</span>`); });
+    res.mal.forEach(i => { const a = de(i.sku); R.paso('ecom-' + i.sku, '❌', a.n,
+        `${ct(a)}<br>No se pudo descontar de Ecom: ${esc(i.error || 'error')} <span class="cartel-sku">SKU ${esc(i.sku)}</span>`); });
+    sale.filter(i => !i.sku).forEach((a, k) => R.paso('ecom-sin' + k, '⚠️', a.n, `${ct(a)}<br>No tiene SKU: descontalo a mano en Ecom`));
+}
 
 async function etqAccion(imprimir, btn) {
     const { c, f } = ETQ, est = $('etqEstado');
@@ -1853,11 +1907,7 @@ async function etqAccion(imprimir, btn) {
             R.paso('ecom', '⏳', 'Descontando de Ecom…');
             try {
                 ecomRes = await descuentoEcomCore(ETQ.c);
-                const sale = loQueSale(ETQ.c), deSku = sku => sale.find(i => i.sku === sku) || {};
-                const lin = ecomRes.okN.map(i => `−${i.q} ${esc(nomItem(deSku(i.sku)))} <span class="cartel-sku">SKU ${esc(i.sku)}</span>: stock <b>${esc(i.antes)} → ${esc(i.despues)}</b>`)
-                    .concat(ecomRes.mal.map(i => `⚠️ ${esc(nomItem(deSku(i.sku)))} <span class="cartel-sku">SKU ${esc(i.sku)}</span>: ${esc(i.error || 'no se pudo')}`));
-                if (ecomRes.nada) R.paso('ecom', '✅', 'Ecom: ya estaba descontado');
-                else R.paso('ecom', ecomRes.mal.length ? '❌' : '✅', ecomRes.mal.length ? (ecomRes.okN.length ? 'Ecom: se descontó solo una parte' : 'Ecom: no se pudo descontar') : 'Descontado de Ecom', lin.join('<br>'));
+                pasosEcom(R, ETQ.c, ecomRes);
                 return !ecomRes.mal.length;
             } catch (e) { R.paso('ecom', '❌', 'Ecom: no se pudo descontar', esc(e.message || String(e))); return false; }
         })() : Promise.resolve(true);

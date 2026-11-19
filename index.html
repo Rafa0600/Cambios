@@ -282,6 +282,10 @@
         .etq-prev { margin: 14px auto 8px; overflow: hidden; border-radius: 6px; box-shadow: 0 4px 18px rgba(0,0,0,.5); background: #fff; }
         #etqPrev { width: 265px; height: 504px; border: 0; transform-origin: top left; display: block; background: #fff; }
         .etq-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .etq-dnd { font-size: 10.5px; color: var(--muted); margin-left: 4px; }
+        .etq-imp { display: flex; gap: 8px; margin-top: 14px; } .etq-imp .btn2 { flex: 1; height: 42px; }
+        .etq-prevs { display: flex; flex-direction: column; align-items: center; }
+        .etq-prev.tk { margin-top: 4px; } #tkPrev { width: 265px; height: 300px; border: 0; transform-origin: top left; display: block; background: #fff; }
         .redactar { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
         .redactar textarea { width: 100%; min-height: 70px; max-height: 160px; border-radius: 12px; border: 1px solid var(--border-bright);
             background: var(--surface-2); color: var(--text); padding: 10px 12px; font-size: 15px; outline: none; resize: vertical; }
@@ -1494,10 +1498,12 @@ async function abrirEtiqueta(c) {
     const { lleva, retira } = detalleTexto(c);
     ETQ.sid = sh ? String(sh.id) : String(c.envio || '');
     ETQ.tapada = tapada;
+    ETQ.llevaAuto = lleva.join('\n');
+    ETQ.imp = { grande: true, oficina: true };      // qué se imprime (las dos por defecto)
     ETQ.f = {
         nombre: ra.receiver_name || c.comprador || c.nick || '',
         zona: (ra.city || ra.neighborhood) ? zonaDetallada(nombreDe(ra.neighborhood), nombreDe(ra.city), ra.zip_code) : '',
-        calle: tapada ? '' : calle, ref: String(ra.comment || '').trim(), cp: ra.zip_code || '',
+        calle: tapada ? '' : calle, ref: limpiarRef(ra.comment), cp: ra.zip_code || '',
         valor: valor ? String(Math.round(valor)) : '', fecha: c.fecha,
         lleva: lleva.join('\n'), retira: retira.join('\n'), nota: '', urgente: false,
     };
@@ -1510,10 +1516,6 @@ function etiquetaHTML(f, caso, c) {
     const region = (partes[0] || '').trim(), barrio = partes.slice(1).join(' - ').trim();
     const regionShow = /^(capital federal|caba)$/i.test(region) ? 'CABA' : region.toUpperCase();
     const fl = f.fecha ? fechaLargaIso(f.fecha) : '';
-    const det = [f.lleva ? `<b>LLEVAR:</b> ${esc(f.lleva).replace(/\n/g, ' · ')}` : '', c.traer && f.retira ? `<b>RETIRAR:</b> ${esc(f.retira).replace(/\n/g, ' · ')}` : '']
-        .filter(Boolean).join('<br>');
-    const largoDet = (f.lleva + f.retira).length;
-    const fsDet = largoDet > 160 ? 3.7 : largoDet > 100 ? 4.5 : 5.2;
     const fsBarrio = barrio.length > 30 ? 5 : barrio.length > 18 ? 6.5 : 8;
     const css = `*{box-sizing:border-box;margin:0;padding:0}html,body{background:#fff}
 .e{width:265px;height:504px;overflow:hidden;background:#fff;color:#000;padding:0 ${mm(5)} ${mm(5)};display:flex;flex-direction:column;font-family:"Segoe UI",Roboto,Arial,sans-serif}
@@ -1528,15 +1530,16 @@ function etiquetaHTML(f, caso, c) {
 .dir{font-size:${mm(6.4)};font-weight:800;text-align:center;line-height:1.15;margin-bottom:${mm(1.5)}}
 .info{font-size:${mm(3.9)};text-align:center;color:#222;line-height:1.35;margin-bottom:${mm(3)}}
 .urg{background:#000;color:#fff;font-size:${mm(5)};font-weight:900;text-align:center;padding:${mm(1.5)};margin-bottom:${mm(2)};border-radius:${mm(1.5)};letter-spacing:.1em}
-.det{font-size:${mm(fsDet)};font-weight:700;line-height:1.25;border:1.3px solid #000;border-radius:${mm(1.5)};padding:${mm(1.8)} ${mm(2)};margin-bottom:${mm(2)}}
 .nota{font-size:${mm(4.2)};font-weight:800;text-align:center;border:1.3px dashed #000;border-radius:${mm(1.5)};padding:${mm(1.5)};margin-bottom:${mm(2)};line-height:1.2}
-.ban{background:#000;color:#fff;font-size:${mm(3.3)};font-weight:900;text-align:center;padding:${mm(1.6)};border-radius:${mm(1.5)};letter-spacing:.04em}
+.ban{background:#000;color:#fff;font-weight:900;text-align:center;padding:${mm(2.2)} ${mm(1.5)};border-radius:${mm(2)};line-height:1.15;margin-top:auto}
+.ban b{display:block;font-size:${mm(7)};letter-spacing:.04em}.ban span{display:block;font-size:${mm(4.4)};letter-spacing:.03em;margin-top:${mm(.8)}}
 .foot{margin-top:auto;padding-top:${mm(1.8)};border-top:1px solid #000;display:flex;justify-content:space-between;align-items:baseline;font-size:${mm(2.6)};color:#444}
 .caso{font-size:${mm(4)};font-weight:700;color:#000}.caso b{font-family:Consolas,monospace;font-weight:900;font-size:${mm(5.5)}}
 .ven{font-family:Consolas,monospace;font-weight:900;color:#000;font-size:${mm(3.2)}}
 .casoG{margin-top:auto;text-align:center;border:2px solid #000;border-radius:${mm(2)};padding:${mm(1.5)} 0;font-size:${mm(4)};font-weight:700;letter-spacing:.04em}
 .casoG b{display:block;font-family:Consolas,monospace;font-weight:900;font-size:${mm(11)};line-height:1;letter-spacing:.02em}
-.casoG + .foot{margin-top:${mm(2)}}`;
+.casoG + .foot{margin-top:${mm(2)}}
+.ban + .casoG{margin-top:${mm(2.5)}}`;
     const info = [f.ref ? esc(f.ref) : '', f.cp ? `<b>CP:</b> ${esc(f.cp)}` : ''].filter(Boolean).join(' · ');
     const body = `<div class="e"><div class="troq"><div class="tipo">↻ CAMBIO ↻</div>${fl ? `<div class="tf">${esc(fl)}</div>` : ''}</div>` +
         (fl ? `<div class="f2">${esc(fl)}</div>` : '') +
@@ -1544,10 +1547,47 @@ function etiquetaHTML(f, caso, c) {
         `<div class="reg">${esc(regionShow || '—')}</div>` + (barrio ? `<div class="bar">${esc(barrio)}</div>` : '') +
         `<div class="dir">${esc(f.calle || '—')}</div>` + (info ? `<div class="info">${info}</div>` : '') +
         (f.urgente ? '<div class="urg">!! URGENTE !!</div>' : '') +
-        (det ? `<div class="det">${det}</div>` : '') + (f.nota ? `<div class="nota">${esc(f.nota)}</div>` : '') +
-        (c.traer ? '<div class="ban">↻ CAMBIO · retirar paquete anterior ↻</div>' : '') +
+        (f.nota ? `<div class="nota">${esc(f.nota)}</div>` : '') +
+        (c.traer ? '<div class="ban"><b>↻ CAMBIO ↻</b><span>RETIRAR PAQUETE ANTERIOR</span></div>' : '') +
         (caso ? `<div class="casoG">CASO<b>${esc(caso)}</b></div>` : '') +
         `<div class="foot"><span>mikra.com.ar</span><span class="ven">Venta #${esc(String(c.venta || '').slice(-8))}</span></div></div>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`;
+}
+
+// "3 A Referencia: 3 A" → "3 A" (ML repite el piso en la referencia)
+function limpiarRef(t) {
+    t = String(t || '').replace(/\s+/g, ' ').trim();
+    const m = t.match(/^(.*?)\s*Referencia:\s*(.*)$/i);
+    if (m && normNom(m[1]) === normNom(m[2])) return m[1];
+    if (m && !m[1]) return m[2];
+    if (m) return `${m[1]} · ${m[2]}`;                         // "P.B D Referencia: Entre…" → "P.B D · Entre…"
+    return t;
+}
+// Ticket de la oficina: el nº de caso y QUÉ HAY QUE PREPARAR (72 mm = 265 px, como Imprimir)
+function ticketHTML(f, caso, c) {
+    const auto = ETQ && f.lleva === ETQ.llevaAuto;           // sin editar → con SKU y talle bien separados
+    const its = auto ? loQueSale(c).map(i => `<div class="it">☐ ${i.q > 1 ? `<b>${i.q} ×</b> ` : ''}${esc(i.n)}<small>${esc([i.c, i.t ? 'T: ' + i.t : ''].filter(Boolean).join(' · '))}${i.sku ? ` · SKU ${esc(i.sku)}` : ''}</small></div>`)
+        : String(f.lleva || '').split('\n').filter(x => x.trim()).map(x => `<div class="it">☐ ${esc(x)}</div>`);
+    const css = `*{box-sizing:border-box;margin:0;padding:0}html,body{background:#fff}
+.t{width:265px;padding:4px 6px 10px;color:#000;font-family:"Segoe UI",Roboto,Arial,sans-serif}
+.h{text-align:center;font-size:19px;font-weight:900;letter-spacing:.03em}
+.caso{text-align:center;border:2px solid #000;border-radius:7px;margin:6px 0;padding:3px 0 5px}
+.caso small{display:block;font-size:11px;font-weight:700;letter-spacing:.08em}
+.caso b{font-family:Consolas,monospace;font-size:38px;font-weight:900;line-height:1}
+.l{font-size:13px;line-height:1.3;text-align:center}.l b{font-weight:800}
+.sec{border-top:1.5px dashed #000;margin-top:7px;padding-top:6px}
+.sec h4{font-size:12px;font-weight:900;letter-spacing:.06em;margin-bottom:3px}
+.it{font-size:16px;font-weight:800;line-height:1.2;margin:5px 0}.it small{display:block;font-size:12px;font-weight:600;margin-left:16px}
+.nota{font-size:13px;font-weight:700;border:1.5px dashed #000;border-radius:5px;padding:4px 6px;margin-top:7px}
+.pie{font-size:10.5px;text-align:center;margin-top:8px;color:#222}`;
+    const body = `<div class="t"><div class="h">↻ CAMBIO · PREPARAR</div>` +
+        `<div class="caso"><small>CASO</small><b>${esc(caso || '#…')}</b></div>` +
+        `<div class="l">Entrega: <b>${esc(f.fecha ? fechaLargaIso(f.fecha) : '')}</b></div>` +
+        `<div class="l"><b>${esc(f.nombre || '')}</b>${c.nick ? ' · ' + esc(c.nick) : ''}${c.cuenta ? ' · ' + esc(c.cuenta.toUpperCase()) : ''}</div>` +
+        `<div class="l">${esc(f.zona || '')}</div>` +
+        `<div class="sec"><h4>LLEVAR</h4>${its.join('') || '<div class="it">—</div>'}</div>` +
+        (f.nota ? `<div class="nota">${esc(f.nota)}</div>` : '') +
+        `<div class="pie">Venta #${esc(c.venta || '')} · ${esc(new Date().toLocaleString('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</div></div>`;
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`;
 }
 
@@ -1561,17 +1601,22 @@ function pintarEtiqueta() {
         inp('ref', 'Piso / depto / referencia') +
         `<div class="etq-fila"><div>${inp('cp', 'CP', 'inputmode="numeric"')}</div><div>${inp('valor', 'Valor $ (para el caso)', 'inputmode="numeric"')}</div></div>` +
         `<label>Día de entrega</label><input data-etq="fecha" type="date" value="${esc(f.fecha)}">` +
-        `<label>📦 Llevarle</label><textarea data-etq="lleva" rows="2">${esc(f.lleva)}</textarea>` +
-        (c.traer ? `<label>↩ Retirar</label><textarea data-etq="retira" rows="2">${esc(f.retira)}</textarea>` : '') +
+        `<label>📦 Llevarle <span class="etq-dnd">va en el ticket de la oficina y en Flex</span></label><textarea data-etq="lleva" rows="2">${esc(f.lleva)}</textarea>` +
+        (c.traer ? `<label>↩ Retirar <span class="etq-dnd">va solo en el caso de Flex (para reconocer el paquete cuando vuelve)</span></label><textarea data-etq="retira" rows="2">${esc(f.retira)}</textarea>` : '') +
         inp('nota', 'Nota en la etiqueta (opcional)') +
         `<label class="etq-chk"><input type="checkbox" data-etq="urgente" ${f.urgente ? 'checked' : ''}> !! URGENTE !!</label></div>` +
-        `<div class="etq-prev"><iframe id="etqPrev" title="Vista previa"></iframe></div>` +
+        `<div class="etq-imp"><button class="btn2${ETQ.imp.grande ? ' on' : ''}" data-imp="grande">${ETQ.imp.grande ? '✓ ' : ''}📦 Etiqueta grande</button>` +
+            `<button class="btn2${ETQ.imp.oficina ? ' on' : ''}" data-imp="oficina">${ETQ.imp.oficina ? '✓ ' : ''}🎫 Ticket oficina</button></div>` +
+        `<div class="etq-prevs"><div class="etq-prev"><iframe id="etqPrev" title="Etiqueta"></iframe></div>` +
+            `<div class="etq-prev tk"><iframe id="tkPrev" title="Ticket"></iframe></div></div>` +
         `<div class="ayuda" style="text-align:center">${caso ? `Caso <b style="color:var(--text)">${esc(caso)}</b> ya creado en Flex.` : `Al imprimir se crea el caso en Flex (Cambio, vence el ${esc(dmyIso(f.fecha))}).`}</div>` +
-        `<div class="etq-btns"><button class="guardar" id="etqImprimir">🖨️ ${caso ? 'Reimprimir etiqueta' : 'Crear caso e imprimir'}</button>` +
+        `<div class="etq-btns"><button class="guardar" id="etqImprimir">🖨️ ${caso ? 'Reimprimir' : 'Crear caso e imprimir'}</button>` +
         (caso ? '' : `<button class="link-btn" id="etqSoloCaso">Solo crear el caso (sin imprimir)</button>`) +
         `<div class="ayuda" id="etqEstado" style="text-align:center"></div></div>`;
     refrescarPrev();
     $('subIn').onclick = async e => {
+        const ib = e.target.closest('[data-imp]');
+        if (ib) { ETQ.imp[ib.dataset.imp] = !ETQ.imp[ib.dataset.imp]; ib.classList.toggle('on'); ib.textContent = (ETQ.imp[ib.dataset.imp] ? '✓ ' : '') + ib.textContent.replace(/^✓ /, ''); return; }
         if (e.target.closest('#etqImprimir')) return etqAccion(true, e.target.closest('button'));
         if (e.target.closest('#etqSoloCaso')) return etqAccion(false, e.target.closest('button'));
     };
@@ -1588,6 +1633,12 @@ function refrescarPrev() {
     const w = ($('subIn').clientWidth || 340) - 28, s = Math.min(1.3, w / 265);
     fr.style.transform = `scale(${s})`;
     fr.parentElement.style.height = Math.ceil(504 * s) + 'px'; fr.parentElement.style.width = Math.ceil(265 * s) + 'px';
+    const tk = $('tkPrev');                                   // el ticket: alto según lo que tenga
+    if (tk) {
+        tk.onload = () => { try { const h = tk.contentDocument.body.scrollHeight; tk.style.height = h + 'px'; tk.parentElement.style.height = Math.ceil(h * s) + 'px'; } catch (e) {} };
+        tk.srcdoc = ticketHTML(ETQ.f, (x.caso && x.caso.id) || '#…', ETQ.c);
+        tk.style.transform = `scale(${s})`; tk.parentElement.style.width = Math.ceil(265 * s) + 'px';
+    }
 }
 async function etqAccion(imprimir, btn) {
     const { c, f } = ETQ, est = $('etqEstado');
@@ -1622,29 +1673,40 @@ async function etqAccion(imprimir, btn) {
             catch (e) { c.extra = x; }
         }
         if (!imprimir) { est.textContent = `✅ Caso ${x.caso.id} creado en Flex`; toast(`✅ Caso ${x.caso.id} creado en Flex`); pintarEtiqueta(); return; }
-        est.textContent = 'Mandando a la impresora…';      // 2) imprimir en la PC (etiqueta grande)
-        const html = etiquetaHTML(f, x.caso.id, ETQ.c);
-        const r = await fetchT(PRINT_URL + '/job', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-Key': PRINT_KEY },
-            body: JSON.stringify({ html, title: 'Cambio ' + (c.nick || f.nombre) + ' ' + x.caso.id, target: 'grande', copies: 1 }) }, 20000);
-        const j = await r.json().catch(() => ({}));
-        if (!j.id) throw new Error(j.error || 'la impresora no respondió');
-        if (j.agentOnline === false) { est.textContent = '🔴 La PC está desconectada: se imprime cuando se conecte'; btn.disabled = false; return; }
-        est.textContent = '🖨️ Imprimiendo…';
-        const fin = Date.now() + 45000;
-        while (Date.now() < fin) {
-            await sleep(1500);
-            let s; try { s = await (await fetchT(PRINT_URL + '/job?id=' + j.id, { cache: 'no-store', headers: { 'X-Key': PRINT_KEY } }, 10000)).json(); } catch (e) { continue; }
-            if (s.status === 'done') {
-                est.textContent = `✅ Etiqueta impresa · caso ${x.caso.id}`; toast(`✅ Etiqueta impresa · caso ${x.caso.id}`);
-                x = { ...((ETQ && ETQ.c.extra) || x), caso: { ...x.caso, impreso: true } };
-                try { const nuevo = await guardarEnNube({ ...ETQ.c, extra: x }); reemplazar(nuevo); ETQ.c = nuevo; } catch (e) {}
-                btn.disabled = false; return;
-            }
-            if (s.status === 'offline') { est.textContent = '⚠️ La etiquetera grande no contesta (¿apagada o sin red?). Prendela y reimprimí.'; btn.disabled = false; return; }
-            if (s.status === 'error') { est.textContent = '⚠️ Error al imprimir: ' + (s.error || ''); btn.disabled = false; return; }
-            if (s.status === 'cancelled' || s.status === 'expired') break;
+        // 2) imprimir en la PC: etiqueta grande + ticket de la oficina, en paralelo
+        const quiero = ['grande', 'oficina'].filter(t => ETQ.imp[t]);
+        if (!quiero.length) { est.textContent = 'Elegí qué imprimir (etiqueta y/o ticket)'; btn.disabled = false; return; }
+        const NOM = { grande: 'Etiqueta', oficina: 'Ticket' };
+        const estado = {}; quiero.forEach(t => estado[t] = '⏳');
+        const pintarEst = () => { est.textContent = quiero.map(t => `${NOM[t]} ${estado[t]}`).join(' · '); };
+        pintarEst();
+        const trabajos = quiero.map(async t => {
+            try {
+                const html = t === 'grande' ? etiquetaHTML(f, x.caso.id, ETQ.c) : ticketHTML(f, x.caso.id, ETQ.c);
+                const r = await fetchT(PRINT_URL + '/job', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-Key': PRINT_KEY },
+                    body: JSON.stringify({ html, title: `Cambio ${c.nick || f.nombre} ${x.caso.id} (${NOM[t].toLowerCase()})`, target: t, copies: 1 }) }, 20000);
+                const j = await r.json().catch(() => ({}));
+                if (!j.id) throw new Error(j.error || 'no respondió');
+                if (j.agentOnline === false) { estado[t] = '🔴 PC desconectada (sale cuando se conecte)'; pintarEst(); return false; }
+                estado[t] = '🖨️'; pintarEst();
+                const finT = Date.now() + 45000;
+                while (Date.now() < finT) {
+                    await sleep(1500);
+                    let s2; try { s2 = await (await fetchT(PRINT_URL + '/job?id=' + j.id, { cache: 'no-store', headers: { 'X-Key': PRINT_KEY } }, 10000)).json(); } catch (e) { continue; }
+                    if (s2.status === 'done') { estado[t] = '✅'; pintarEst(); return true; }
+                    if (s2.status === 'offline') { estado[t] = t === 'grande' ? '⚠️ la etiquetera no contesta' : '⚠️ la ticketera no contesta'; pintarEst(); return false; }
+                    if (s2.status === 'error') { estado[t] = '⚠️ ' + (s2.error || 'error'); pintarEst(); return false; }
+                    if (s2.status === 'cancelled' || s2.status === 'expired') break;
+                }
+                estado[t] = '⏳ en cola'; pintarEst(); return false;
+            } catch (e) { estado[t] = '⚠️ ' + (e.message || e); pintarEst(); return false; }
+        });
+        const ok = await Promise.all(trabajos);
+        if (ok.every(Boolean)) toast(`✅ Impreso · caso ${x.caso.id}`);
+        if (ok[quiero.indexOf('grande')]) {                 // la etiqueta salió: queda marcada
+            x = { ...((ETQ && ETQ.c.extra) || x), caso: { ...x.caso, impreso: true } };
+            try { const nuevo = await guardarEnNube({ ...ETQ.c, extra: x }); reemplazar(nuevo); ETQ.c = nuevo; } catch (e) {}
         }
-        est.textContent = '⏳ Sigue en cola, todavía no salió';
     } catch (e) {
         est.textContent = '⚠️ ' + (e.message || e);
     }

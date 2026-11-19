@@ -87,6 +87,7 @@
         .m-confusion .motivo { background: rgba(255,170,68,.13); color: var(--orange); }
         .m-otro .motivo { background: rgba(197,139,255,.13); color: var(--purple); }
         .c-sub { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 12.5px; color: var(--muted-2); }
+        .chip-cp[data-venta] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         .chip-cp { font-family: 'Space Mono', monospace; font-size: 11.5px; font-weight: 700; color: var(--text);
             background: var(--surface-2); border: 1px solid var(--border-bright); border-radius: 8px; padding: 5px 8px; }
         .chip-cp i { font-style: normal; color: var(--yellow); margin-left: 4px; font-size: 10.5px; }
@@ -773,7 +774,7 @@ function cardHTML(c) {
     const { lleva, retira, retiraTxt } = llevaRetira(c);
     const con = c.motivo === 'confusion' && c.con
         ? `<div class="c-sub">🔀 Se cruzó con <b style="color:var(--text)">${esc(c.con.numero ? c.con.numero + ' · ' : '')}${esc(c.con.nick || c.con.comprador || '')}</b>` +
-          (c.con.venta ? ` <button class="chip-cp" data-copiar="${esc(c.con.venta)}">#${esc(c.con.venta)}</button>` : '') + `</div>` : '';
+          (c.con.venta ? ` <button class="chip-cp" data-venta="${esc(c.con.venta)}" title="Tocá: abrir la venta · mantené: copiar">#${esc(c.con.venta)} ↗</button>` : '') + `</div>` : '';
     const hecho = c.estado === 'hecho', x = c.extra || {};
     const { fotos, txt } = resumenCorto(c);
     const nMsg = MSG_N.get(claveMsg(c)) || 0;          // 💬 solo si la venta tiene mensajes
@@ -789,7 +790,7 @@ function cardHTML(c) {
         `<div class="c-det">` +
         `<div class="c-sub">${c.comprador ? `👤 ${esc(c.comprador)}` : ''}` +
             (c.nick ? ` <button class="chip-cp" data-copiar="${esc(c.nick)}">@${esc(c.nick)}</button>` : '') +
-            (c.venta ? ` <button class="chip-cp" data-copiar="${esc(c.venta)}">🧾 #${esc(c.venta)}</button>` : '') + `</div>` +
+            (c.venta ? ` <button class="chip-cp" data-venta="${esc(c.venta)}" title="Tocá: abrir la venta · mantené: copiar">🧾 #${esc(c.venta)} ↗</button>` : '') + `</div>` +
         con +
         (lleva.length ? `<div class="c-sec lleva"><h4>📦 Llevarle</h4>${lleva.join('')}</div>` : '') +
         (retira.length || retiraTxt ? `<div class="c-sec retira"><h4>↩ Retirar</h4>${retira.join('') || `<div class="ayuda">${esc(retiraTxt)}</div>`}</div>` : '') +
@@ -911,7 +912,29 @@ async function cambiarEstado(c, estado, msg, deshacer) {
         if (msg) toast(msg, deshacer ? 'Deshacer' : null, async () => { try { reemplazar(await guardarEnNube({ ...antes })); } catch (e) { toast('No se pudo deshacer'); } }, 6000);
     } catch (e) { toast(e.clave ? 'Falta la clave' : 'No se pudo guardar · revisá la conexión'); }
 }
+// Nº de venta: tocar = abrir la venta en Mercado Libre · mantener apretado = copiarlo
+const linkVenta = v => `https://vendedores.mercadolibre.com.ar/ventas/${encodeURIComponent(v)}/detalle`;
+let _lpVenta = null, _lpHecho = false;
+$('lista').addEventListener('pointerdown', e => {
+    const b = e.target.closest('[data-venta]'); if (!b) return;
+    _lpHecho = false; clearTimeout(_lpVenta);
+    _lpVenta = setTimeout(async () => {
+        _lpHecho = true;
+        const ok = await copiar(b.dataset.venta);
+        b.classList.toggle('ok', ok); setTimeout(() => b.classList.remove('ok'), 1200);
+        try { navigator.vibrate && navigator.vibrate(30); } catch (err) {}
+        toast(ok ? `✓ Copiado: ${b.dataset.venta}` : 'No se pudo copiar', null, null, 1600);
+    }, 550);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('lista').addEventListener(ev, () => clearTimeout(_lpVenta)));
+$('lista').addEventListener('contextmenu', e => { if (e.target.closest('[data-venta]')) e.preventDefault(); });
 $('lista').addEventListener('click', async e => {
+    const vb = e.target.closest('[data-venta]');
+    if (vb) {
+        if (_lpHecho) { _lpHecho = false; return; }          // fue mantener apretado (ya copió)
+        window.open(linkVenta(vb.dataset.venta), '_blank');
+        return;
+    }
     const cp = e.target.closest('[data-copiar]');
     if (cp) {
         const ok = await copiar(cp.dataset.copiar);          // tocar = copiar (sin cartelito "copiar")

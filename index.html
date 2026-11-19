@@ -241,6 +241,21 @@
         .vec-fotos img { height: 54px; width: 54px; border-radius: 6px; object-fit: cover; background: #fff; }
         .vec-who { font-size: 11.5px; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+        .cartel { border-radius: 18px; max-width: 420px; margin: 0 auto; border: 1px solid var(--border-bright); padding: 16px; }
+        .cartel-tit { font-size: 17px; font-weight: 800; margin-bottom: 12px; }
+        .cartel-fila { display: flex; gap: 10px; align-items: flex-start; padding: 10px 10px; border-radius: 12px; margin-bottom: 7px;
+            background: var(--surface-2); border: 1px solid var(--border-bright); }
+        .cartel-fila.ok { border-color: rgba(0,230,118,.35); background: rgba(0,230,118,.07); }
+        .cartel-fila.mal { border-color: rgba(255,170,68,.45); background: rgba(255,170,68,.08); }
+        .cartel-ico { font-size: 20px; line-height: 1.1; width: 24px; text-align: center; flex: none; }
+        .cartel-fila.esp .cartel-ico { animation: lat 1s ease-in-out infinite; }
+        @keyframes lat { 50% { opacity: .35; } }
+        .cartel-fila b { display: block; font-size: 15px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+        .cartel-fila small { display: block; font-size: 12.5px; color: var(--muted-2); margin-top: 3px; line-height: 1.45; }
+        .cartel-fila small b { display: inline; font-size: 13px; color: var(--text); font-family: 'Space Mono', monospace; }
+        .cartel-sku { font-family: 'Space Mono', monospace; font-size: 11.5px; }
+        .cartel-pie { font-size: 12.5px; color: var(--muted-2); margin: 4px 2px 10px; }
+        .cartel-ok { width: 100%; }
         .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 300;
             background: #24243f; color: var(--text); border: 1px solid var(--border-bright); border-radius: 14px; padding: 11px 14px;
             font-size: 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.6); max-width: 92vw; }
@@ -1735,6 +1750,30 @@ function refrescarPrev() {
         tk.style.transform = `scale(${s})`; tk.parentElement.style.width = Math.ceil(265 * s) + 'px';
     }
 }
+// Cartel con el resultado de cada paso: se va llenando en vivo y queda abierto hasta tocar OK
+function cartelPasos(titulo) {
+    const o = document.createElement('div');
+    o.className = 'sub open'; o.style.cssText = 'z-index:350;align-items:center;padding:16px';
+    o.innerHTML = `<div class="sub-in cartel"><div class="cartel-tit">${esc(titulo)}</div><div class="cartel-lista"></div>` +
+        `<div class="cartel-pie"></div><button class="guardar cartel-ok" disabled>Haciendo…</button></div>`;
+    document.body.appendChild(o);
+    const filas = {};
+    return {
+        paso(k, ico, txt, det) {
+            let r = filas[k];
+            if (!r) { r = filas[k] = document.createElement('div'); o.querySelector('.cartel-lista').appendChild(r); }
+            r.className = 'cartel-fila ' + (ico === '✅' ? 'ok' : /[⏳🖨]/u.test(ico) ? 'esp' : 'mal');
+            r.innerHTML = `<span class="cartel-ico">${ico}</span><div><b>${esc(txt)}</b>${det ? `<small>${det}</small>` : ''}</div>`;
+        },
+        fin(pie, alCerrar) {
+            o.querySelector('.cartel-pie').innerHTML = pie || '';
+            const b = o.querySelector('.cartel-ok'); b.disabled = false; b.textContent = 'OK';
+            b.onclick = () => { o.remove(); alCerrar && alCerrar(); };
+        }
+    };
+}
+const nomItem = i => [i.n, i.c, i.t ? 'T: ' + i.t : ''].filter(Boolean).join(' · ');
+
 async function etqAccion(imprimir, btn) {
     const { c, f } = ETQ, est = $('etqEstado');
     const valor = Math.round(Number(String(f.valor || '').replace(/\./g, '').split(',')[0].replace(/\D/g, '')) || 0);
@@ -1744,9 +1783,12 @@ async function etqAccion(imprimir, btn) {
         if (!valor) return toast('💵 Falta el valor (lo pide el caso de Flex)');
     }
     btn.disabled = true;
+    const R = cartelPasos(`↻ Cambio · ${c.nick || f.nombre || ''}`);
+    const cerrarYVer = () => { if (ETQ && ETQ.c.id === c.id) pintarEtiqueta(); };
     try {
-        if (!x.caso) {                                        // 1) caso en Flex
-            est.textContent = 'Creando el caso en Flex…';
+        // 1) caso en Flex
+        if (!x.caso) {
+            R.paso('caso', '⏳', 'Creando el caso en Flex…');
             const notas = [f.lleva ? 'Llevar: ' + f.lleva.replace(/\n/g, ', ') : '', c.traer && f.retira ? 'Retirar: ' + f.retira.replace(/\n/g, ', ') : '', f.nota]
                 .filter(Boolean).join(' · ').slice(0, 450);
             const direccion = [f.calle, f.ref, f.zona].filter(Boolean).join(' · ');
@@ -1759,68 +1801,90 @@ async function etqAccion(imprimir, btn) {
                 if (!d || !d.ok || !d.record) throw new Error((d && d.error) || 'Flex no respondió');
                 return d;
             };
-            let d = await pedirCaso(ETQ.sid || ('MAN-' + Date.now()));
-            // Ya había un caso ABIERTO de otra cosa para ese envío (ej. una entrega): el cambio va en uno propio
-            if (d.duplicate && d.record.tipo !== 'cambio') d = await pedirCaso((ETQ.sid || 'MAN') + '-CAMBIO-' + Date.now().toString(36));
+            let d;
+            try {
+                d = await pedirCaso(ETQ.sid || ('MAN-' + Date.now()));
+                // Ya había un caso ABIERTO de otra cosa para ese envío (ej. una entrega): el cambio va en uno propio
+                if (d.duplicate && d.record.tipo !== 'cambio') d = await pedirCaso((ETQ.sid || 'MAN') + '-CAMBIO-' + Date.now().toString(36));
+            } catch (e) {
+                R.paso('caso', '❌', 'No se pudo crear el caso en Flex', esc(e.message || String(e)));
+                R.fin('No se imprimió ni se descontó nada. Probá de nuevo.', cerrarYVer);
+                btn.disabled = false; return;
+            }
             x.caso = { id: d.record.id, at: ahoraARiso(), impreso: false };
-            if (d.duplicate) toast(`Ya había un caso de cambio abierto: ${d.record.id}`);
+            R.paso('caso', '✅', `Caso ${d.record.id} ${d.duplicate ? 'ya estaba abierto en Flex' : 'creado en Flex'}`, `Cambio · vence el ${esc(dmyIso(f.fecha))} · $ ${valor.toLocaleString('es-AR')}`);
             try { const nuevo = await guardarEnNube({ ...c, extra: x }); reemplazar(nuevo); ETQ.c = nuevo; }
             catch (e) { c.extra = x; }
-        }
-        if (!imprimir) { est.textContent = `✅ Caso ${x.caso.id} creado en Flex`; toast(`✅ Caso ${x.caso.id} creado en Flex`); pintarEtiqueta(); return; }
+            refrescarPrev();                                   // la vista previa ya con el número de caso
+        } else R.paso('caso', '✅', `Caso ${x.caso.id}`, 'Ya estaba creado en Flex');
+        if (!imprimir) { est.textContent = `✅ Caso ${x.caso.id} creado en Flex`; R.fin('', cerrarYVer); btn.disabled = false; return; }
+
         // 2) en paralelo: etiqueta grande + ticket de la oficina + descontar de Ecom
         const quiero = ['grande', 'oficina'].filter(t => ETQ.imp[t]);
         const conEcom = ETQ.imp.ecom && descPendiente(ETQ.c), conHecho = ETQ.imp.hecho && ETQ.c.estado !== 'hecho';
-        const NOM = { grande: 'Etiqueta', oficina: 'Ticket', ecom: 'Ecom' };
-        const estado = {}; quiero.forEach(t => estado[t] = '⏳'); if (conEcom) estado.ecom = '⏳';
-        const pintarEst = () => { est.textContent = Object.keys(estado).map(t => `${NOM[t]} ${estado[t]}`).join(' · '); };
-        pintarEst();
+        const NOM = { grande: 'Etiqueta grande', oficina: 'Ticket de la oficina' };
+        const DONDE = { grande: 'la etiquetera de la oficina', oficina: 'la ticketera de la oficina' };
+        const hora = () => new Date().toLocaleTimeString('es-AR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+        est.textContent = '';
         const trabajos = quiero.map(async t => {
+            R.paso(t, '⏳', `${NOM[t]}: mandando…`);
             try {
                 const html = t === 'grande' ? etiquetaHTML(f, x.caso.id, ETQ.c) : ticketHTML(f, x.caso.id, ETQ.c);
                 const r = await fetchT(PRINT_URL + '/job', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-Key': PRINT_KEY },
-                    body: JSON.stringify({ html, title: `Cambio ${c.nick || f.nombre} ${x.caso.id} (${NOM[t].toLowerCase()})`, target: t, copies: 1 }) }, 20000);
+                    body: JSON.stringify({ html, title: `Cambio ${c.nick || f.nombre} ${x.caso.id} (${t === 'grande' ? 'etiqueta' : 'ticket'})`, target: t, copies: 1 }) }, 20000);
                 const j = await r.json().catch(() => ({}));
-                if (!j.id) throw new Error(j.error || 'no respondió');
-                if (j.agentOnline === false) { estado[t] = '🔴 PC desconectada (sale cuando se conecte)'; pintarEst(); return false; }
-                estado[t] = '🖨️'; pintarEst();
-                const finT = Date.now() + 45000;
+                if (!j.id) throw new Error(j.error || 'el servicio de impresión no respondió');
+                if (j.agentOnline === false) { R.paso(t, '⚠️', `${NOM[t]}: la PC está desconectada`, 'Quedó en cola: sale sola cuando se conecte la PC.'); return false; }
+                R.paso(t, '🖨️', `${NOM[t]}: imprimiendo…`);
+                const finT = Date.now() + 60000;
                 while (Date.now() < finT) {
-                    await sleep(1500);
+                    await sleep(1200);
                     let s2; try { s2 = await (await fetchT(PRINT_URL + '/job?id=' + j.id, { cache: 'no-store', headers: { 'X-Key': PRINT_KEY } }, 10000)).json(); } catch (e) { continue; }
-                    if (s2.status === 'done') { estado[t] = '✅'; pintarEst(); return true; }
-                    if (s2.status === 'offline') { estado[t] = t === 'grande' ? '⚠️ la etiquetera no contesta' : '⚠️ la ticketera no contesta'; pintarEst(); return false; }
-                    if (s2.status === 'error') { estado[t] = '⚠️ ' + (s2.error || 'error'); pintarEst(); return false; }
-                    if (s2.status === 'cancelled' || s2.status === 'expired') break;
+                    if (s2.status === 'printed' || s2.status === 'done') { R.paso(t, '✅', `${NOM[t]}: impresa`, `Salió en ${DONDE[t]} · ${hora()}`); return true; }
+                    if (s2.status === 'offline') { R.paso(t, '❌', `${NOM[t]}: ${t === 'grande' ? 'la etiquetera' : 'la ticketera'} no contesta`, 'Revisá que esté prendida y con papel.'); return false; }
+                    if (s2.status === 'error') { R.paso(t, '❌', `${NOM[t]}: error al imprimir`, esc(s2.error || '')); return false; }
+                    if (s2.status === 'cancelled' || s2.status === 'expired') { R.paso(t, '❌', `${NOM[t]}: se canceló`, ''); return false; }
                 }
-                estado[t] = '⏳ en cola'; pintarEst(); return false;
-            } catch (e) { estado[t] = '⚠️ ' + (e.message || e); pintarEst(); return false; }
+                R.paso(t, '⏳', `${NOM[t]}: sigue en cola`, 'La PC todavía no la tomó (sale cuando la tome).'); return false;
+            } catch (e) { R.paso(t, '❌', `${NOM[t]}: no se pudo mandar`, esc(e.message || String(e))); return false; }
         });
         let ecomRes = null;
         const trabajoEcom = conEcom ? (async () => {
+            R.paso('ecom', '⏳', 'Descontando de Ecom…');
             try {
                 ecomRes = await descuentoEcomCore(ETQ.c);
-                estado.ecom = ecomRes.mal.length ? '⚠️ ' + txtDesc(ecomRes.okN, ecomRes.mal) : '✅ ' + txtDesc(ecomRes.okN, []);
-                pintarEst(); return !ecomRes.mal.length;
-            } catch (e) { estado.ecom = '⚠️ ' + (e.message || e); pintarEst(); return false; }
+                const sale = loQueSale(ETQ.c), deSku = sku => sale.find(i => i.sku === sku) || {};
+                const lin = ecomRes.okN.map(i => `−${i.q} ${esc(nomItem(deSku(i.sku)))} <span class="cartel-sku">SKU ${esc(i.sku)}</span>: stock <b>${esc(i.antes)} → ${esc(i.despues)}</b>`)
+                    .concat(ecomRes.mal.map(i => `⚠️ ${esc(nomItem(deSku(i.sku)))} <span class="cartel-sku">SKU ${esc(i.sku)}</span>: ${esc(i.error || 'no se pudo')}`));
+                if (ecomRes.nada) R.paso('ecom', '✅', 'Ecom: ya estaba descontado');
+                else R.paso('ecom', ecomRes.mal.length ? '❌' : '✅', ecomRes.mal.length ? (ecomRes.okN.length ? 'Ecom: se descontó solo una parte' : 'Ecom: no se pudo descontar') : 'Descontado de Ecom', lin.join('<br>'));
+                return !ecomRes.mal.length;
+            } catch (e) { R.paso('ecom', '❌', 'Ecom: no se pudo descontar', esc(e.message || String(e))); return false; }
         })() : Promise.resolve(true);
         const okImp = await Promise.all(trabajos), okEcom = await trabajoEcom;
+
         // 3) guardar todo junto: etiqueta impresa, descuento de Ecom y, si salió TODO bien, hecho
         let xf = { ...((ETQ && ETQ.c.extra) || x) };
         if (ecomRes) xf = { ...xf, desc: ecomRes.extra.desc };
         if (okImp[quiero.indexOf('grande')]) xf.caso = { ...xf.caso, impreso: true };
         const todoOk = okImp.every(Boolean) && okEcom;
         const nuevoEstado = conHecho && todoOk ? 'hecho' : ETQ.c.estado;
+        let guardo = true;
         try { const nuevo = await guardarEnNube({ ...ETQ.c, extra: xf, estado: nuevoEstado }); reemplazar(nuevo); ETQ.c = nuevo; }
-        catch (e) { ETQ.c.extra = xf; reemplazar(ETQ.c); if (ecomRes) toast('⚠️ Se descontó de Ecom pero no se guardó la marca en la nube (no lo vuelvas a descontar)', null, null, 8000); }
-        if (todoOk) {
-            const hecho = nuevoEstado === 'hecho';
-            toast(`✅ Listo · caso ${x.caso.id}${hecho ? ' · pasó a Hechos' : ''}`, null, null, 5000);
-            if (hecho) { est.textContent += ' · ✅ Hecho'; setTimeout(() => { if (ETQ && ETQ.c.id === c.id) cerrarSub(); }, 1800); }
-        } else if (conHecho) est.textContent += ' · no se marcó hecho (algo no salió)';
+        catch (e) {
+            guardo = false; ETQ.c.extra = xf; reemplazar(ETQ.c);
+            R.paso('nube', '⚠️', 'No se guardó en la nube', ecomRes && ecomRes.okN.length ? 'Se descontó de Ecom pero no quedó la marca: NO lo vuelvas a descontar.' : 'Revisá la conexión.');
+        }
+        const hecho = guardo && nuevoEstado === 'hecho' && conHecho;
+        if (conHecho) R.paso('hecho', hecho ? '✅' : '⚠️', hecho ? 'Pasó a Hechos' : 'No se marcó hecho',
+            hecho ? '' : 'Algo no salió: cuando esté resuelto tocá ✅ Hecho en la tarjeta.');
+        quiero.forEach((t, k) => { if (okImp[k] && ETQ) ETQ.imp[t] = false; });   // si reintenta, no se vuelve a imprimir lo que ya salió
         $('etqOpc') && ($('etqOpc').innerHTML = opcionesHTML());
+        R.fin(todoOk ? '' : 'Lo que salió bien ya quedó guardado; si reintentás, no se repite.',
+            () => { if (hecho) { if (ETQ && ETQ.c.id === c.id) cerrarSub(); } else cerrarYVer(); });
     } catch (e) {
-        est.textContent = '⚠️ ' + (e.message || e);
+        R.paso('err', '❌', 'Algo falló', esc(e.message || String(e)));
+        R.fin('', cerrarYVer);
     }
     btn.disabled = false;
 }
@@ -1852,7 +1916,7 @@ function pedirClaveStock(mal) {
         const o = document.createElement('div');
         o.className = 'sub open'; o.style.cssText = 'z-index:400;align-items:center;padding:16px';
         o.innerHTML = `<form class="sub-in" style="border-radius:18px;max-width:360px;margin:0 auto;border:1px solid var(--border-bright)">` +
-            `<div class="sub-hd"><b>🔒 Clave para mandar mensajes</b></div>` +
+            `<div class="sub-hd"><b>🔒 Clave del stock</b></div>` +
             `<div class="ayuda" style="margin:0 0 10px">${mal ? '❌ Clave incorrecta, probá de nuevo.' : 'Es la misma clave que usás para cambiar stock (Pedidos / Control de Stock). Se pide una sola vez.'}</div>` +
             `<div class="busq"><input type="password" autocomplete="current-password" placeholder="Clave"><button class="ir">OK</button></div>` +
             `<button type="button" class="link-btn" data-x style="margin-top:8px">Cancelar</button></form>`;

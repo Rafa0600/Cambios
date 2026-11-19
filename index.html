@@ -257,6 +257,31 @@
         .chat-aviso { font-size: 12.5px; color: var(--orange); background: rgba(255,170,68,.08); border: 1px solid rgba(255,170,68,.3);
             border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
         .sel-resumen .btn2 { flex: none; }
+        .card.m-articulo::before { background: #7c8cff; } .m-articulo .motivo { background: rgba(124,140,255,.14); color: #9aa6ff; }
+        .card.m-otracosa::before { background: var(--pink); } .m-otracosa .motivo { background: rgba(255,111,181,.13); color: var(--pink); }
+        .card.m-fallado::before { background: var(--red); } .m-fallado .motivo { background: rgba(255,77,94,.13); color: var(--red); }
+        .c-acc2 button { flex: 1; font-size: 13.5px; font-weight: 600; }
+        .c-extra { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .ok-chip { font-size: 11.5px; color: var(--green); background: rgba(0,230,118,.08); border: 1px solid rgba(0,230,118,.3);
+            border-radius: 8px; padding: 4px 8px; line-height: 1.35; }
+        .art-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .art-res { display: flex; gap: 10px; align-items: center; text-align: left; background: var(--surface-2); border: 1px solid var(--border-bright);
+            border-radius: 12px; padding: 6px; color: var(--text); }
+        .art-res img, .art-res .sinf { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #fff; flex: none;
+            display: grid; place-items: center; }
+        .art-res .sinf { background: var(--surface-3); }
+        .art-res .tx { min-width: 0; } .art-res b { display: block; font-size: 13.5px; } .art-res small { color: var(--muted-2); font-size: 11.5px; }
+        .etq-form label { display: block; font-size: 11.5px; color: var(--muted-2); margin: 9px 2px 3px; }
+        .etq-form input:not([type=checkbox]), .etq-form textarea { width: 100%; border-radius: 10px; border: 1px solid var(--border-bright);
+            background: var(--surface-2); color: var(--text); padding: 9px 11px; font-size: 15px; font-family: inherit; outline: none; }
+        .etq-form textarea { resize: vertical; }
+        .etq-form input:focus, .etq-form textarea:focus { border-color: var(--yellow); }
+        .etq-fila { display: flex; gap: 8px; } .etq-fila > div { flex: 1; min-width: 0; }
+        .etq-form .etq-chk { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); margin-top: 12px; }
+        .etq-chk input { width: 20px; height: 20px; }
+        .etq-prev { margin: 14px auto 8px; overflow: hidden; border-radius: 6px; box-shadow: 0 4px 18px rgba(0,0,0,.5); background: #fff; }
+        #etqPrev { width: 265px; height: 504px; border: 0; transform-origin: top left; display: block; background: #fff; }
+        .etq-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
         .redactar { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
         .redactar textarea { width: 100%; min-height: 70px; max-height: 160px; border-radius: 12px; border: 1px solid var(--border-bright);
             background: var(--surface-2); color: var(--text); padding: 10px 12px; font-size: 15px; outline: none; resize: vertical; }
@@ -331,9 +356,14 @@ const TZ = 'America/Argentina/Buenos_Aires';
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MOTIVOS = {
     cambio:    { ico: '🔁', txt: 'Otro talle o color', sub: 'Quiere cambiar por otro talle/color' },
+    articulo:  { ico: '🔄', txt: 'Otro artículo', sub: 'Lo cambia por un artículo distinto (ej: biker sin bolsillo)' },
+    otracosa:  { ico: '📦', txt: 'Le mandamos otra cosa', sub: 'Se le manda de nuevo lo que compró' },
+    fallado:   { ico: '⚠️', txt: 'Fallado', sub: 'Se le manda uno nuevo y se retira el fallado' },
     confusion: { ico: '🔀', txt: 'Se confundió', sub: 'Le llegó el paquete de otro comprador' },
-    otro:      { ico: '📝', txt: 'Otro', sub: 'Falla, faltante u otra cosa (con nota)' },
+    otro:      { ico: '📝', txt: 'Otro', sub: 'Faltante u otra cosa (con nota)' },
 };
+const CON_NUEVO = new Set(['cambio', 'articulo']);              // se elige un artículo/variante NUEVO
+const MANDAR_SUYO = new Set(['otracosa', 'fallado', 'confusion']); // se le manda de nuevo lo que compró
 
 // ── Ayudas ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -606,10 +636,10 @@ function articulosDe(orders) {
         else if (comps && comps.length === 1) {
             const e = CAT.bySku[sku]; const m = parseX(e ? `${e.titulo} ${e.color}` : '') > 1 ? parseX(`${e.titulo} ${e.color}`) : parseX(t.title);
             filas = [{ sku: String(comps[0]), q: q * m }];
-        } else filas = [{ sku, q: q * (CAT && CAT.bySku[sku] ? parseX(`${CAT.bySku[sku].titulo} ${CAT.bySku[sku].color}`) : 1) }];
+        } else filas = [{ sku, q: q * (CAT && CAT.bySku[sku] ? parseX(`${CAT.bySku[sku].titulo} ${CAT.bySku[sku].color}`) : 1), qv: q }];   // qv = unidades VENDIDAS de ese SKU (un "Pack X2" fuera de la tabla = 1)
         filas.forEach(f => {
             const e = (CAT && CAT.bySku[f.sku]) || {};
-            const fila = { sku: f.sku, n: e.titulo || t.title || '—', c: e.color || (comps ? '' : vColor), t: e.talle || (comps ? '' : vTalle), img: fotoSku(f.sku), q: f.q };
+            const fila = { sku: f.sku, n: e.titulo || t.title || '—', c: e.color || (comps ? '' : vColor), t: e.talle || (comps ? '' : vTalle), img: fotoSku(f.sku), q: f.q, ...(f.qv && f.qv !== f.q ? { qv: f.qv } : {}) };
             const k = [fila.sku, fila.n, fila.c, fila.t].join('|');
             const ya = grupos.get(k); if (ya) ya.q += fila.q; else grupos.set(k, fila);
         });
@@ -650,7 +680,7 @@ function itemsHistorial(items) {
 let PEND = [], HECHOS = [], TAB = 'pend', CARGANDO = false, HECHOS_CARGADOS = false;
 const ABIERTAS = new Set();      // tarjetas desplegadas (todas arrancan cerradas)
 const parseJ = (s, d) => { if (s && typeof s === 'object') return s; try { return s ? JSON.parse(s) : d; } catch (e) { return d; } };
-function normCambio(c) { return { ...c, traer: !!(+c.traer), items: parseJ(c.items, []), con: parseJ(c.con, null) }; }
+function normCambio(c) { return { ...c, traer: !!(+c.traer), items: parseJ(c.items, []), con: parseJ(c.con, null), extra: parseJ(c.extra, {}) || {} }; }
 function guardarCache() { try { localStorage.setItem(CACHE_LS, JSON.stringify({ PEND, HECHOS, t: Date.now() })); } catch (e) {} }
 function leerCache() { try { const c = JSON.parse(localStorage.getItem(CACHE_LS) || 'null'); if (c) { PEND = c.PEND || []; HECHOS = c.HECHOS || []; } } catch (e) {} }
 
@@ -693,12 +723,12 @@ function itemHTML(f, extra) {
 function llevaRetira(c) {
     const sel = (c.items || []).filter(i => i.sel);
     let lleva = [], retira = [], retiraTxt = '';
-    if (c.motivo === 'cambio') {
+    if (CON_NUEVO.has(c.motivo)) {
         const camb = (c.items || []).filter(i => i.nuevo);
         lleva = camb.map(i => {
             const nv = i.nuevo;
             const tx = `<em>${esc(nv.c || i.c)}</em> · T: <span class="tl">${esc(nv.t || i.t)}</span>` +
-                (!c.traer ? `<br><span class="antes-tx">en vez de ${esc([i.c, i.t].filter(Boolean).join(' · '))}</span>` : '');
+                (!c.traer ? `<br><span class="antes-tx">en vez de ${esc([nv.n && nv.n !== i.n ? i.n : '', i.c, i.t].filter(Boolean).join(' · '))}</span>` : '');
             return itemHTML({ n: nv.n || i.n, img: nv.img || i.img, q: i.q }, tx);
         });
         if (c.traer) retira = camb.map(i => itemHTML(i));
@@ -708,10 +738,31 @@ function llevaRetira(c) {
             if (c.motivo === 'confusion') {
                 if (c.con && c.con.items && c.con.items.length) retira = c.con.items.map(i => itemHTML(i));
                 else retiraTxt = 'Lo que le llegó por error';
-            } else retira = sel.map(i => itemHTML(i));
+            } else if (c.motivo === 'otracosa') retiraTxt = 'Lo que le mandamos por error';
+            else retira = sel.map(i => itemHTML(i));
         }
     }
     return { lleva, retira, retiraTxt };
+}
+// Lo que SALE del depósito (para descontar de Ecom y para el WhatsApp): {sku, q, n, c, t}
+function loQueSale(c) {
+    const its = c.items || [];
+    return CON_NUEVO.has(c.motivo)
+        ? its.filter(i => i.nuevo).map(i => ({ sku: i.nuevo.sku || '', q: +i.q || 1, n: i.nuevo.n || i.n, c: i.nuevo.c || i.c, t: i.nuevo.t || i.t }))
+        : its.filter(i => i.sel).map(i => ({ sku: i.sku || '', q: +(i.qv || i.q) || 1, n: i.n, c: i.c, t: i.t }));
+}
+// Texto corto de lo que se lleva / se retira (para el caso de Flex y la etiqueta)
+function detalleTexto(c) {
+    const f = i => [i.n, i.c, i.t ? 'T: ' + i.t : ''].filter(Boolean).join(' ') + ((+i.q || 1) > 1 ? ` ×${+i.q}` : '');
+    const lleva = loQueSale(c).map(f);
+    let retira = [];
+    if (c.traer) {
+        if (CON_NUEVO.has(c.motivo)) retira = (c.items || []).filter(i => i.nuevo).map(f);
+        else if (c.motivo === 'confusion') retira = (c.con && c.con.items && c.con.items.length) ? c.con.items.map(f) : ['lo que le llegó por error'];
+        else if (c.motivo === 'otracosa') retira = ['lo que le mandamos por error'];
+        else retira = (c.items || []).filter(i => i.sel).map(f);
+    }
+    return { lleva, retira };
 }
 function cardHTML(c) {
     const m = MOTIVOS[c.motivo] || MOTIVOS.otro;
@@ -719,7 +770,7 @@ function cardHTML(c) {
     const con = c.motivo === 'confusion' && c.con
         ? `<div class="c-sub">🔀 Se cruzó con <b style="color:var(--text)">${esc(c.con.numero ? c.con.numero + ' · ' : '')}${esc(c.con.nick || c.con.comprador || '')}</b>` +
           (c.con.venta ? ` <button class="chip-cp" data-copiar="${esc(c.con.venta)}">#${esc(c.con.venta)}</button>` : '') + `</div>` : '';
-    const hecho = c.estado === 'hecho';
+    const hecho = c.estado === 'hecho', x = c.extra || {};
     const { fotos, txt } = resumenCorto(c);
     const nMsg = MSG_N.get(claveMsg(c)) || 0;          // 💬 solo si la venta tiene mensajes
     const btnMsgs = nMsg ? `<button data-acc="mensajes" title="Mensajes de la venta">💬 ${nMsg}</button>`
@@ -739,6 +790,11 @@ function cardHTML(c) {
         (lleva.length ? `<div class="c-sec lleva"><h4>📦 Llevarle</h4>${lleva.join('')}</div>` : '') +
         (retira.length || retiraTxt ? `<div class="c-sec retira"><h4>↩ Retirar</h4>${retira.join('') || `<div class="ayuda">${esc(retiraTxt)}</div>`}</div>` : '') +
         (c.nota ? `<div class="c-nota">📝 ${esc(c.nota)}</div>` : '') +
+        estadoExtraHTML(c) +
+        // Etiqueta + caso de Flex · descontar de Ecom · compartir por WhatsApp
+        `<div class="c-acc c-acc2"><button data-acc="etiqueta">🏷️ ${x.caso ? 'Etiqueta ' + esc(x.caso.id) : 'Etiqueta y caso'}</button>` +
+            (descPendiente(c) ? `<button data-acc="ecom">➖ Ecom</button>` : '') +
+            `<button data-acc="wa" title="Compartir por WhatsApp">📤</button></div>` +
         (hecho
             ? `<div class="c-meta">✅ Hecho ${esc(cuandoTxt(c.hecho_en))} · era para el ${esc(nombreDia(c.fecha))}</div>` +
               `<div class="c-acc"><button class="volver-btn" data-acc="volver">↩ Volver a pendientes</button>${btnMsgs}</div>`
@@ -748,19 +804,38 @@ function cardHTML(c) {
               `<div class="c-meta">Cargado ${esc(cuandoTxt(c.creado))}${c.actualizado && c.actualizado !== c.creado ? ' · editado ' + esc(cuandoTxt(c.actualizado)) : ''}</div>`) +
         `</div></div>`;
 }
+// Caso de Flex y descuento de Ecom (guardados en extra)
+function estadoExtraHTML(c) {
+    const x = c.extra || {}, out = [];
+    if (x.caso) out.push(`<span class="ok-chip">🏷️ Caso ${esc(x.caso.id)}${x.caso.impreso ? ' · impresa' : ''}</span>`);
+    if (x.desc && (x.desc.items || []).some(i => i.ok)) {
+        const ok = x.desc.items.filter(i => i.ok);
+        out.push(`<span class="ok-chip">➖ Descontado de Ecom ${esc(cuandoTxt(x.desc.at))}: ${ok.map(i => `${esc(i.sku)} −${i.q}`).join(', ')}</span>`);
+    }
+    return out.length ? `<div class="c-extra">${out.join('')}</div>` : '';
+}
+// ¿Queda algo con SKU sin descontar de Ecom?
+function descPendiente(c) {
+    const hechos = new Set(((c.extra && c.extra.desc && c.extra.desc.items) || []).filter(i => i.ok).map(i => i.sku));
+    return loQueSale(c).some(i => i.sku && !hechos.has(i.sku));
+}
 // Renglón de la tarjeta cerrada: fotos de lo que se lleva + qué es, en corto
 function resumenCorto(c) {
     const its = c.items || [];
-    if (c.motivo === 'cambio') {
+    if (CON_NUEVO.has(c.motivo)) {
         const camb = its.filter(i => i.nuevo);
         const a = camb[0];
         let txt = c.nota || '';
         if (a) {          // lo importante primero: el cambio (la foto ya dice qué artículo es)
-            const nc = a.nuevo.c || a.c, nt = a.nuevo.t || a.t;
-            txt = normNom(nc) === normNom(a.c) ? `${a.c} · T: ${a.t} → ${nt}`
-                : normNom(nt) === normNom(a.t) ? `${a.c} → ${nc} · T: ${a.t}`
-                : `${a.c} ${a.t} → ${nc} ${nt}`;
-            txt += ` · ${a.n}` + (camb.length > 1 ? ` (+${camb.length - 1} más)` : '');
+            const nc = a.nuevo.c || a.c, nt = a.nuevo.t || a.t, nn = a.nuevo.n || a.n;
+            if (normNom(nn) !== normNom(a.n)) txt = `${a.n} ${a.c} ${a.t} → ${nn} ${nc} ${nt}`;      // otro artículo
+            else {
+                txt = normNom(nc) === normNom(a.c) ? `${a.c} · T: ${a.t} → ${nt}`
+                    : normNom(nt) === normNom(a.t) ? `${a.c} → ${nc} · T: ${a.t}`
+                    : `${a.c} ${a.t} → ${nc} ${nt}`;
+                txt += ` · ${a.n}`;
+            }
+            txt += camb.length > 1 ? ` (+${camb.length - 1} más)` : '';
         }
         return { fotos: camb.map(i => i.nuevo.img || i.img).filter(Boolean).slice(0, 3), txt };
     }
@@ -768,6 +843,8 @@ function resumenCorto(c) {
     let txt;
     if (c.motivo === 'confusion') txt = `Mandarle ${sel.length ? sel.map(i => i.n).slice(0, 2).join(', ') : 'lo suyo'}` +
         (c.con && c.con.numero ? ` · se cruzó con ${c.con.numero}` : '');
+    else if (c.motivo === 'otracosa') txt = `Mandarle de nuevo ${sel.length ? sel.map(i => [i.n, i.c, i.t].filter(Boolean).join(' ')).slice(0, 2).join(', ') : 'lo que compró'}`;
+    else if (c.motivo === 'fallado') txt = `Fallado: ${sel.length ? sel.map(i => [i.n, i.c, i.t].filter(Boolean).join(' ')).slice(0, 2).join(', ') : 'ver detalle'}`;
     else txt = c.nota || sel.map(i => i.n).join(', ') || 'Ver detalle';
     return { fotos: sel.map(i => i.img).filter(Boolean).slice(0, 3), txt };
 }
@@ -857,6 +934,9 @@ $('lista').addEventListener('click', async e => {
     if (acc === 'borrar') { if (confirm(`¿Borrar el cambio de ${c.nick || c.comprador}?`)) cambiarEstado(c, 'borrado', '🗑 Borrado', true); return; }
     if (acc === 'editar') return abrirForm(c);
     if (acc === 'mensajes') return abrirMensajes(c);
+    if (acc === 'ecom') return descontarEcom(c, b);
+    if (acc === 'wa') return compartirWA(c);
+    if (acc === 'etiqueta') return abrirEtiqueta(c);
     if (acc === 'mover') {
         const ya = card.querySelector('.mover');
         if (ya) { ya.remove(); return; }
@@ -925,17 +1005,21 @@ function pintarForm() {
     }
     if (tieneVenta && F.motivo) {
         // 3 · artículos
-        const titulos = { cambio: 'Elegí qué artículo cambia y por cuál', confusion: '¿Qué hay que mandarle?', otro: '¿De qué artículo se trata? (opcional)' };
+        const titulos = { cambio: 'Elegí qué artículo cambia y por cuál', articulo: 'Elegí qué artículo cambia y por cuál otro',
+            otracosa: '¿Qué hay que mandarle? (lo que compró)', fallado: '¿Qué vino fallado?', confusion: '¿Qué hay que mandarle?',
+            otro: '¿De qué artículo se trata? (opcional)' };
+        const selTxt = { otracosa: 'Mandarle este', confusion: 'Mandarle este', fallado: 'Vino fallado', otro: 'Es este' };
         h += `<div class="paso${pasoArticulosListo() ? ' listo' : ''}"><div class="paso-t"><span class="n">3</span>${esc(titulos[F.motivo])}</div>`;
         h += (F.items || []).map((it, k) => {
-            const on = F.motivo === 'cambio' ? !!it.nuevo : !!it.sel;
+            const on = CON_NUEVO.has(F.motivo) ? !!it.nuevo : !!it.sel;
             let acc;
-            if (F.motivo === 'cambio') {
-                acc = it.nuevo
-                    ? `<span class="nuevo-tag">→ ${esc(it.nuevo.c || it.c)} · T: ${esc(it.nuevo.t || it.t)}</span><button class="btn2 amarillo" data-elegir="${k}">Cambiar</button><button class="btn2" data-quitar="${k}">✕</button>`
-                    : `<button class="btn2 amarillo" data-elegir="${k}">🔁 Elegir talle / color nuevo</button>`;
+            if (CON_NUEVO.has(F.motivo)) {
+                const nv = it.nuevo, otroArt = nv && nv.n && normNom(nv.n) !== normNom(it.n);
+                acc = nv
+                    ? `<span class="nuevo-tag">→ ${otroArt ? esc(nv.n) + ' · ' : ''}${esc(nv.c || it.c)} · T: ${esc(nv.t || it.t)}</span><button class="btn2 amarillo" data-elegir="${k}">Cambiar</button><button class="btn2" data-quitar="${k}">✕</button>`
+                    : `<button class="btn2 amarillo" data-elegir="${k}">${F.motivo === 'articulo' ? '🔄 Elegir otro artículo' : '🔁 Elegir talle / color nuevo'}</button>`;
             } else {
-                acc = `<button class="btn2${it.sel ? ' on' : ''}" data-sel="${k}">${it.sel ? '✓ ' : ''}${F.motivo === 'confusion' ? 'Mandarle este' : 'Es este'}</button>`;
+                acc = `<button class="btn2${it.sel ? ' on' : ''}" data-sel="${k}">${it.sel ? '✓ ' : ''}${selTxt[F.motivo] || 'Es este'}</button>`;
             }
             return `<div class="art${on ? ' on' : ''}">${itemHTML(it)}<div class="art-acc">${acc}</div></div>`;
         }).join('') || '<div class="ayuda">No pude leer los artículos de esta compra (contalo en la nota).</div>';
@@ -948,7 +1032,8 @@ function pintarForm() {
         }
         h += `</div>`;
         // 4 · retirar
-        const retTxt = { cambio: 'Retirar el artículo que tiene', confusion: 'Retirar lo que le llegó por error', otro: 'Retirar algo' };
+        const retTxt = { cambio: 'Retirar el artículo que tiene', articulo: 'Retirar el artículo que tiene', otracosa: 'Retirar lo que le mandamos por error',
+            fallado: 'Retirar el fallado', confusion: 'Retirar lo que le llegó por error', otro: 'Retirar algo' };
         h += `<div class="paso listo"><div class="paso-t"><span class="n">4</span>${esc(retTxt[F.motivo])}</div>` +
             `<div class="toggle"><button class="${F.traer ? 'on si' : ''}" data-traer="1">↩ Sí, retirar</button><button class="${!F.traer ? 'on' : ''}" data-traer="0">No retirar</button></div></div>`;
         // 5 · día
@@ -967,13 +1052,14 @@ function pintarForm() {
     const btn = $('btnGuardar'), listo = tieneVenta && F.motivo && pasoArticulosListo();
     btn.disabled = !listo;
     btn.textContent = !tieneVenta ? 'Buscá el comprador' : !F.motivo ? 'Elegí qué pasó'
-        : !pasoArticulosListo() ? (F.motivo === 'cambio' ? 'Elegí el talle/color nuevo' : 'Elegí qué mandarle')
+        : !pasoArticulosListo() ? (F.motivo === 'cambio' ? 'Elegí el talle/color nuevo' : F.motivo === 'articulo' ? 'Elegí el artículo nuevo'
+            : F.motivo === 'fallado' ? 'Marcá cuál vino fallado' : 'Elegí qué mandarle')
         : `${F._nuevo ? 'Guardar' : 'Guardar cambios'} · ${relDia(F.fecha) ? relDia(F.fecha) + ' ' : ''}${nombreDia(F.fecha)}`;
 }
 function pasoArticulosListo() {
     if (!F || !F.motivo) return false;
-    if (F.motivo === 'cambio') return (F.items || []).some(i => i.nuevo);
-    if (F.motivo === 'confusion') return (F.items || []).some(i => i.sel) || !(F.items || []).length;
+    if (CON_NUEVO.has(F.motivo)) return (F.items || []).some(i => i.nuevo);
+    if (MANDAR_SUYO.has(F.motivo)) return (F.items || []).some(i => i.sel) || !(F.items || []).length;
     return true;
 }
 
@@ -1111,7 +1197,8 @@ $('form').addEventListener('click', async e => {
     const mo = t.closest('[data-motivo]');
     if (mo) {
         F.motivo = mo.dataset.motivo;
-        if (F.motivo === 'confusion' && !(F.items || []).some(i => i.sel)) (F.items || []).forEach(i => i.sel = true);  // por defecto: mandarle todo lo suyo
+        // por defecto: mandarle todo lo suyo (si se confundió o le mandamos otra cosa)
+        if ((F.motivo === 'confusion' || F.motivo === 'otracosa') && !(F.items || []).some(i => i.sel)) (F.items || []).forEach(i => i.sel = true);
         return pintarForm();
     }
     const sl = t.closest('[data-sel]'); if (sl) { const it = F.items[+sl.dataset.sel]; it.sel = !it.sel; return pintarForm(); }
@@ -1130,12 +1217,14 @@ $('btnGuardar').onclick = async () => {
     const { _nuevo, ...datos } = F;
     datos.items = (datos.items || []).map(i => {
         const o = { sku: i.sku || '', n: i.n, c: i.c || '', t: i.t || '', img: i.img || '', q: +i.q || 1 };
+        if (i.qv) o.qv = +i.qv;
         if (i.sel) o.sel = true;
         if (i.nuevo) o.nuevo = i.nuevo;
         return o;
     });
-    if (datos.motivo === 'cambio') datos.items.forEach(i => delete i.sel);
+    if (CON_NUEVO.has(datos.motivo)) datos.items.forEach(i => delete i.sel);
     else datos.items.forEach(i => delete i.nuevo);
+    datos.extra = datos.extra || {};          // caso de Flex / descuento de Ecom: se conservan al editar
     const btn = $('btnGuardar'); btn.disabled = true; btn.textContent = 'Guardando…';
     try {
         const c = await guardarEnNube(datos);
@@ -1158,19 +1247,60 @@ $('hojaCerrar').onclick = () => {
 let PICK = null;
 function abrirPicker(k) {
     const it = F.items[k];
-    PICK = { k, elegido: it.nuevo ? (it.nuevo.sku || null) : null };
+    const yo = CAT && it.sku ? CAT.bySku[it.sku] : null;
+    const nvTit = it.nuevo && it.nuevo.sku && CAT && CAT.bySku[it.nuevo.sku] ? CAT.bySku[it.nuevo.sku].titulo : '';
+    // "Otro artículo": arranca buscando (con la 1ª palabra del suyo, ej "Biker"); si ya eligió, en ese
+    const buscar = F.motivo === 'articulo' && !nvTit;
+    PICK = { k, elegido: it.nuevo ? (it.nuevo.sku || null) : null, titulo: nvTit || (yo && yo.titulo) || '',
+             buscar, q: buscar ? String(it.n || '').split(/\s+/)[0] : '' };
     pintarPicker();
     $('sub').classList.add('open');
+    if (buscar) setTimeout(() => { const i = $('pBuscar'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 60);
 }
-function cerrarSub() { $('sub').classList.remove('open'); PICK = null; $('subIn').onclick = null; }
+// Buscar un artículo del catálogo por nombre (todas las palabras), con foto y stock total
+function artsQueCoinciden(q) {
+    if (!CAT) return [];
+    const pal = normNom(q).normalize('NFD').replace(/[̀-ͯ]/g, '').split(' ').filter(Boolean);
+    const out = [];
+    for (const [tit, vars] of CAT.porTitulo) {
+        const tn = normNom(tit).normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (pal.length && !pal.every(p => tn.includes(p))) continue;
+        if (vars.some(v => CAT.packs[v.sku])) continue;                 // packs/conjuntos (tabla de packs): no se eligen sueltos
+        const stock = vars.reduce((a, v) => a + Math.max(0, Number(v.stock) || 0), 0);
+        const conFoto = vars.find(v => CAT.imgs[v.sku]);
+        out.push({ tit, n: vars.length, stock, img: conFoto ? fotoSku(conFoto.sku) : '' });
+    }
+    return out.sort((a, b) => (b.stock > 0) - (a.stock > 0) || a.tit.localeCompare(b.tit, 'es')).slice(0, 40);
+}
+function pintarBusquedaArt() {
+    const r = $('pRes'); if (!r) return;
+    const lista = artsQueCoinciden(PICK.q);
+    r.innerHTML = !CAT ? '<div class="cargando">Cargando el catálogo…</div>'
+        : !lista.length ? '<div class="ayuda">No encontré artículos con eso.</div>'
+        : lista.map(a => `<button class="art-res" data-tit="${esc(a.tit)}">${a.img ? `<img loading="lazy" src="${esc(a.img)}" alt="">` : '<span class="sinf">👕</span>'}` +
+            `<span class="tx"><b>${esc(a.tit)}</b><small>${a.n} variantes · ${a.stock > 0 ? `stock ${a.stock}` : 'sin stock'}</small></span></button>`).join('');
+}
+function cerrarSub() { $('sub').classList.remove('open'); PICK = null; ETQ = null; $('subIn').onclick = null; $('subIn').oninput = null; }
 $('sub').addEventListener('click', e => { if (e.target === $('sub') || e.target.closest('[data-cerrar]')) cerrarSub(); });
 function pintarPicker() {
     const it = F.items[PICK.k];
-    const yo = CAT && it.sku ? CAT.bySku[it.sku] : null;
-    const vars = yo ? (CAT.porTitulo.get(yo.titulo) || []) : [];
-    let h = `<div class="sub-hd"><b>🔁 ${esc(it.n)}</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
-        `<div class="ayuda" style="margin:0 0 10px">Tiene: <b style="color:var(--text)">${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b>. Tocá el talle/color nuevo (el número es el stock en la nube).</div>`;
-    if (vars.length > 1) {
+    const yoReal = CAT && it.sku ? CAT.bySku[it.sku] : null;
+    if (PICK.buscar) {                          // ── elegir OTRO artículo ──
+        $('subIn').innerHTML = `<div class="sub-hd"><b>🔄 ¿Por qué artículo lo cambia?</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+            `<div class="ayuda" style="margin:0 0 8px">Tiene: <b style="color:var(--text)">${esc(it.n)} · ${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b></div>` +
+            `<div class="busq"><input id="pBuscar" type="search" autocomplete="off" placeholder="Buscá el artículo (ej: biker liso)" value="${esc(PICK.q)}"></div>` +
+            (PICK.titulo ? `<button class="link-btn" id="pVolverArt" style="padding:8px 2px">← Volver a ${esc(PICK.titulo)}</button>` : '') +
+            `<div id="pRes" class="art-lista"></div>`;
+        pintarBusquedaArt();
+        return;
+    }
+    // la grilla es del artículo elegido (el suyo, u otro si cambia de artículo)
+    const vars = PICK.titulo ? (CAT && CAT.porTitulo.get(PICK.titulo)) || [] : [];
+    const yo = yoReal && yoReal.titulo === PICK.titulo ? yoReal : (vars[0] ? { ...vars[0], color: '', talle: '' } : null);
+    let h = `<div class="sub-hd"><b>🔁 ${esc(PICK.titulo || it.n)}</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+        `<div class="ayuda" style="margin:0 0 6px">Tiene: <b style="color:var(--text)">${PICK.titulo && PICK.titulo !== it.n ? esc(it.n) + ' · ' : ''}${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b>. Tocá el talle/color nuevo (el número es el stock en la nube).</div>` +
+        `<button class="link-btn" id="pOtroArt" style="padding:4px 2px 10px">🔄 ¿Lo cambia por otro artículo? Buscalo</button>`;
+    if (vars.length > 1 || (vars.length === 1 && PICK.titulo !== (yoReal && yoReal.titulo))) {
         const talles = [...new Set(vars.map(v => v.talle || '—'))].sort((a, b) => talleOrden(a) - talleOrden(b) || a.localeCompare(b));
         const porColor = new Map();
         vars.forEach(v => { const c = v.color || '—'; if (!porColor.has(c)) porColor.set(c, new Map()); porColor.get(c).set(v.talle || '—', v); });
@@ -1191,8 +1321,17 @@ function pintarPicker() {
     h += `<div class="manual"><input id="pColor" placeholder="Color nuevo" value="${esc(it.nuevo && !it.nuevo.sku ? it.nuevo.c : '')}"><input id="pTalle" placeholder="Talle nuevo" value="${esc(it.nuevo && !it.nuevo.sku ? it.nuevo.t : '')}" style="max-width:110px"><button class="btn2 amarillo" id="pManual">OK</button></div>`;
     $('subIn').innerHTML = h;
 }
+$('subIn').addEventListener('input', e => {
+    if (!PICK || e.target.id !== 'pBuscar') return;
+    PICK.q = e.target.value;
+    pintarBusquedaArt();
+});
 $('subIn').addEventListener('click', e => {
     if (!PICK) return;
+    if (e.target.closest('#pOtroArt')) { PICK.buscar = true; PICK.q = PICK.q || String(F.items[PICK.k].n || '').split(/\s+/)[0]; pintarPicker(); setTimeout(() => $('pBuscar') && $('pBuscar').focus(), 60); return; }
+    if (e.target.closest('#pVolverArt')) { PICK.buscar = false; pintarPicker(); return; }
+    const ta = e.target.closest('[data-tit]');
+    if (ta) { PICK.titulo = ta.dataset.tit; PICK.buscar = false; pintarPicker(); $('subIn').scrollTop = 0; return; }
     const v = e.target.closest('[data-var]');
     if (v) {
         const e2 = CAT.bySku[v.dataset.var], it = F.items[PICK.k];
@@ -1243,6 +1382,273 @@ async function abrirConQuien() {
         $('subIn').onclick = null;
         cerrarSub(); pintarForm();
     };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  DESCONTAR DE ECOM lo que SALE (lo que se lleva). Lo que retira NO se suma: entra
+//  cuando llega el paquete. Va como "Ajuste manual · cambio NICK" → aparece en
+//  Movimientos como manual (y se copia al Excel con el resto). Pide la clave del stock.
+// ══════════════════════════════════════════════════════════════════════════
+const ahoraARiso = () => new Date().toLocaleString('sv-SE', { timeZone: TZ }).replace(' ', 'T');
+async function descontarEcom(c, btn) {
+    const x = c.extra || {};
+    const ya = new Set(((x.desc && x.desc.items) || []).filter(i => i.ok).map(i => i.sku));
+    const sale = loQueSale(c), sinSku = sale.filter(i => !i.sku), aDesc = sale.filter(i => i.sku && !ya.has(i.sku));
+    if (!aDesc.length) return toast(sinSku.length ? 'Lo que se lleva no tiene SKU: descontalo a mano' : 'Ya está descontado');
+    const lin = aDesc.map(i => `−${i.q}  ${i.sku}  ${[i.n, i.c, i.t].filter(Boolean).join(' ')}`).join('\n');
+    if (!confirm(`¿Descontar de Ecom lo que se lleva?\n\n${lin}` +
+        (sinSku.length ? `\n\n(sin SKU, no se descuenta: ${sinSku.map(i => i.n).join(', ')})` : '') +
+        `\n\nQueda como "Ajuste manual" (sale en Movimientos para el Excel). Lo que retira NO se suma: entra cuando llegue.`)) return;
+    if (btn) { btn.disabled = true; btn.textContent = '➖ …'; }
+    const motivo = ('Ajuste manual · cambio ' + (c.nick || c.comprador || '')).slice(0, 80);
+    let res;
+    try {
+        const r = await fetchConClave(`${ECOMM_PROXY}/bulk-update-stock`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(aDesc.map(i => ({ sku: i.sku, qty: i.q, motivo }))) });       // qty positivo = RESTA (convención del worker)
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !Array.isArray(d.results)) throw new Error(d.error || 'respondió ' + r.status);
+        res = d.results.map((rr, k) => ({ sku: String(rr.sku), q: aDesc[k].q, ok: !!rr.ok, antes: rr.stock_anterior, despues: rr.stock_nuevo, error: rr.error || '' }));
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = '➖ Ecom'; }
+        return toast('No se pudo descontar: ' + (e.message || e), null, null, 6000);
+    }
+    const okN = res.filter(i => i.ok), mal = res.filter(i => !i.ok);
+    const prev = ((x.desc && x.desc.items) || []).filter(i => i.ok);
+    const extra = { ...x, desc: { at: ahoraARiso(), items: [...prev, ...okN], errores: mal } };
+    try { reemplazar(await guardarEnNube({ ...c, extra })); }
+    catch (e) { c.extra = extra; reemplazar(c); toast('⚠️ Se descontó pero no se guardó la marca en la nube (no lo vuelvas a descontar)', null, null, 8000); return; }
+    toast(okN.length ? `➖ Descontado de Ecom: ${okN.map(i => `${i.sku} ${i.antes}→${i.despues}`).join(', ')}` +
+            (mal.length ? ` · ⚠️ no se pudo: ${mal.map(i => `${i.sku} (${i.error})`).join(', ')}` : '')
+        : `⚠️ No se descontó: ${mal.map(i => `${i.sku} (${i.error})`).join(', ')}`, null, null, 8000);
+}
+
+// ── Compartir por WhatsApp (para registrarlo a mano si hace falta): lo que sale, en negativo ──
+function compartirWA(c) {
+    const m = MOTIVOS[c.motivo] || MOTIVOS.otro, x = c.extra || {};
+    const lineas = loQueSale(c).map(i => `-${i.q} ${i.sku || 'SIN-SKU'} ${[i.n, i.c, i.t].filter(Boolean).join(' ')}`);
+    const descOk = x.desc && (x.desc.items || []).some(i => i.ok);
+    const txt = `🔁 ${m.txt.toUpperCase()} · ${c.nick || c.comprador || ''}${c.cuenta ? ' (' + c.cuenta + ')' : ''}\n` +
+        (c.venta ? `Venta #${c.venta}\n` : '') + (lineas.length ? lineas.join('\n') : '(no sale nada)') +
+        (descOk ? '\n✓ ya descontado en Ecom' : '') + (x.caso ? `\nCaso ${x.caso.id}` : '');
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ETIQUETA DE CAMBIO + CASO EN FLEX. La dirección sale del envío de ML (con la
+//  referencia: "portón rojo", piso…), se crea el caso en el Flex dashboard (mismo
+//  Worker y mismos campos que "Nuevo caso" del dashboard) y la etiqueta grande
+//  100×190 se imprime en la PC por mikra-print (igual que la página Imprimir).
+// ══════════════════════════════════════════════════════════════════════════
+const FLEX_URL = 'https://mikra-reclamos-api.rafaelassir.workers.dev';
+const PRINT_URL = 'https://mikra-print.rafaelassir.workers.dev', PRINT_KEY = 'AG4LFDaR5Yhl8QccEtwltnvH';
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+// Zona igual que el Flex dashboard ("CABA - San Telmo", "GBA Oeste - Morón"…)
+const BARRIOS_CABA = new Set(['agronomia','almagro','balvanera','barracas','belgrano','boedo','caballito','chacarita','coghlan','colegiales','constitucion','flores','floresta','la boca','liniers','mataderos','monte castro','monserrat','nueva pompeya','nunez','palermo','parque avellaneda','parque chacabuco','parque patricios','paternal','recoleta','retiro','saavedra','san cristobal','san nicolas','san telmo','velez sarsfield','versailles','villa crespo','villa devoto','villa general mitre','villa lugano','villa luro','villa ortuzar','villa pueyrredon','villa real','villa santa rita','villa urquiza']);
+const normZ = t => String(t || '').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function zonaDetallada(barrio, ciudad, cp) {
+    const b = (barrio || '').trim(), c = (ciudad || '').trim();
+    const esBarrio = n => BARRIOS_CABA.has(normZ(n));
+    const cpN = parseInt(String(cp || '').replace(/\D/g, ''), 10);
+    const genericos = ['CABA', 'Buenos aires', 'Capital Federal'];
+    if (c === 'CABA' || b === 'CABA' || c === 'Buenos aires' || c === 'Capital Federal' || esBarrio(b) || esBarrio(c) || (cpN >= 1000 && cpN <= 1499)) {
+        if (b && !genericos.includes(b)) return `CABA - ${b}`;
+        if (c && !genericos.includes(c) && esBarrio(c)) return `CABA - ${c}`;
+        return 'CABA - Otros';
+    }
+    const grupos = [['GBA Norte', ['San Isidro','Vicente López','San Fernando','Tigre','Olivos','Martínez','Acassuso','Beccar','La Lucila','Villa Adelina']],
+        ['GBA Oeste', ['La Reja','Morón','Hurlingham','Ituzaingó','Ramos Mejía','Ciudadela','Santos Lugares','Villa Luzuriaga','Luzuriaga','Ingeniero Allan','Castelar','El Palomar','Ciudad Jardin Del Palomar','Caseros','San Justo','Villa Sarmiento']],
+        ['GBA Sur', ['Lomas de Zamora','Banfield','Lanús','Avellaneda','Quilmes','Sarandi','Sarandí','Tristán Suárez','Carlos Spegazzini','Bernal Oeste','Temperley','Remedios De Escalada','Valentin Alsina','Berazategui','Florencio Varela','Wilde']],
+        ['Buenos Aires', ['Zárate','Campana','La Plata','Mar del Plata','Bahía Blanca']]];
+    for (const [g, lista] of grupos) if (lista.some(z => normZ(z) === normZ(c) || normZ(z) === normZ(b))) return `${g} - ${c || b}`;
+    return c || b || 'Otras zonas';
+}
+const nombreDe = x => (x && typeof x === 'object' && x.name) ? x.name : (typeof x === 'string' ? x : '');
+const fechaLargaIso = iso => { const [y, m, d] = String(iso).split('-').map(Number); return `${DIAS[diaSem(iso)]}, ${d} de ${MESES[m - 1]}`; };
+const dmyIso = iso => { const [y, m, d] = String(iso).split('-'); return `${d}/${m}/${y}`; };
+
+let ETQ = null;
+async function abrirEtiqueta(c) {
+    ETQ = { c };
+    $('subIn').innerHTML = `<div class="sub-hd"><b>🏷️ Etiqueta de cambio</b><button class="hdr-btn" data-cerrar>✕</button></div><div class="cargando">Buscando la dirección en Mercado Libre…</div>`;
+    $('sub').classList.add('open');
+    const cta = CUENTAS.find(x => x.nombre === c.cuenta);
+    let sh = null, orders = [];
+    if (cta && c.venta) {
+        try {
+            const o1 = await mlGet(cta, `/api/orders/${c.venta}`);
+            if (o1 && o1.id) orders = [o1];
+            else {
+                const pk = await mlGet(cta, `/api/packs/${c.venta}`);
+                const ids = ((pk && pk.orders) || []).map(o => o.id).filter(Boolean);
+                orders = (await Promise.all(ids.map(id => mlGet(cta, `/api/orders/${id}`).catch(() => null)))).filter(o => o && o.id);
+            }
+            const sid = c.envio || (orders[0] && orders[0].shipping && orders[0].shipping.id);
+            if (sid) sh = await mlGet(cta, `/api/shipments/${sid}`);
+        } catch (e) {}
+    }
+    if (!ETQ || ETQ.c !== c) return;
+    const ra = (sh && sh.receiver_address) || {};
+    const calle = ra.street_name ? `${ra.street_name} ${ra.street_number || ''}`.trim() : (ra.address_line || '');
+    const tapada = !calle || /\*\*/.test(calle);
+    const valor = orders.reduce((a, o) => a + (Number(o.total_amount) || 0), 0);
+    const { lleva, retira } = detalleTexto(c);
+    ETQ.sid = sh ? String(sh.id) : String(c.envio || '');
+    ETQ.tapada = tapada;
+    ETQ.f = {
+        nombre: ra.receiver_name || c.comprador || c.nick || '',
+        zona: (ra.city || ra.neighborhood) ? zonaDetallada(nombreDe(ra.neighborhood), nombreDe(ra.city), ra.zip_code) : '',
+        calle: tapada ? '' : calle, ref: String(ra.comment || '').trim(), cp: ra.zip_code || '',
+        valor: valor ? String(Math.round(valor)) : '', fecha: c.fecha,
+        lleva: lleva.join('\n'), retira: retira.join('\n'), nota: '', urgente: false,
+    };
+    pintarEtiqueta();
+}
+
+function etiquetaHTML(f, caso, c) {
+    const mm = v => (v * 2.65).toFixed(1) + 'px';          // la grande: 100 mm = 265 px (igual que Imprimir)
+    const partes = String(f.zona || '').split(' - ');
+    const region = (partes[0] || '').trim(), barrio = partes.slice(1).join(' - ').trim();
+    const regionShow = /^(capital federal|caba)$/i.test(region) ? 'CABA' : region.toUpperCase();
+    const fl = f.fecha ? fechaLargaIso(f.fecha) : '';
+    const det = [f.lleva ? `<b>LLEVAR:</b> ${esc(f.lleva).replace(/\n/g, ' · ')}` : '', c.traer && f.retira ? `<b>RETIRAR:</b> ${esc(f.retira).replace(/\n/g, ' · ')}` : '']
+        .filter(Boolean).join('<br>');
+    const largoDet = (f.lleva + f.retira).length;
+    const fsDet = largoDet > 160 ? 3.7 : largoDet > 100 ? 4.5 : 5.2;
+    const fsBarrio = barrio.length > 30 ? 5 : barrio.length > 18 ? 6.5 : 8;
+    const css = `*{box-sizing:border-box;margin:0;padding:0}html,body{background:#fff}
+.e{width:265px;height:504px;overflow:hidden;background:#fff;color:#000;padding:0 ${mm(5)} ${mm(5)};display:flex;flex-direction:column;font-family:"Segoe UI",Roboto,Arial,sans-serif}
+.troq{height:88px;margin:0 -${mm(5)};display:flex;flex-direction:column;align-items:center;justify-content:center;border-bottom:1.5px solid #000}
+.tipo{font-size:${mm(12)};font-weight:900;line-height:1;letter-spacing:.03em}
+.tf{font-size:${mm(5)};font-weight:700;margin-top:${mm(2)}}
+.f2{text-align:center;font-size:${mm(3.6)};color:#333;font-weight:700;padding:${mm(1)} 0 ${mm(1.2)};border-bottom:1px solid #000;margin-bottom:${mm(2.5)}}
+.nom{font-size:${mm(6)};font-weight:800;text-align:center;line-height:1.15;margin-bottom:${mm(3)}}
+.nom span{display:block;font-size:${mm(2.6)};color:#666;font-weight:500;text-transform:uppercase;letter-spacing:.1em;margin-bottom:${mm(.5)}}
+.reg{font-size:${mm(11)};font-weight:900;text-align:center;line-height:1;margin-bottom:${mm(1.5)};text-transform:uppercase}
+.bar{font-size:${mm(fsBarrio)};font-weight:800;text-align:center;line-height:1.1;margin-bottom:${mm(3.5)}}
+.dir{font-size:${mm(6.4)};font-weight:800;text-align:center;line-height:1.15;margin-bottom:${mm(1.5)}}
+.info{font-size:${mm(3.9)};text-align:center;color:#222;line-height:1.35;margin-bottom:${mm(3)}}
+.urg{background:#000;color:#fff;font-size:${mm(5)};font-weight:900;text-align:center;padding:${mm(1.5)};margin-bottom:${mm(2)};border-radius:${mm(1.5)};letter-spacing:.1em}
+.det{font-size:${mm(fsDet)};font-weight:700;line-height:1.25;border:1.3px solid #000;border-radius:${mm(1.5)};padding:${mm(1.8)} ${mm(2)};margin-bottom:${mm(2)}}
+.nota{font-size:${mm(4.2)};font-weight:800;text-align:center;border:1.3px dashed #000;border-radius:${mm(1.5)};padding:${mm(1.5)};margin-bottom:${mm(2)};line-height:1.2}
+.ban{background:#000;color:#fff;font-size:${mm(3.3)};font-weight:900;text-align:center;padding:${mm(1.6)};border-radius:${mm(1.5)};letter-spacing:.04em}
+.foot{margin-top:auto;padding-top:${mm(1.8)};border-top:1px solid #000;display:flex;justify-content:space-between;align-items:baseline;font-size:${mm(2.6)};color:#444}
+.caso{font-size:${mm(4)};font-weight:700;color:#000}.caso b{font-family:Consolas,monospace;font-weight:900;font-size:${mm(5.5)}}
+.ven{font-family:Consolas,monospace;font-weight:900;color:#000;font-size:${mm(3.2)}}
+.casoG{margin-top:auto;text-align:center;border:2px solid #000;border-radius:${mm(2)};padding:${mm(1.5)} 0;font-size:${mm(4)};font-weight:700;letter-spacing:.04em}
+.casoG b{display:block;font-family:Consolas,monospace;font-weight:900;font-size:${mm(11)};line-height:1;letter-spacing:.02em}
+.casoG + .foot{margin-top:${mm(2)}}`;
+    const info = [f.ref ? esc(f.ref) : '', f.cp ? `<b>CP:</b> ${esc(f.cp)}` : ''].filter(Boolean).join(' · ');
+    const body = `<div class="e"><div class="troq"><div class="tipo">↻ CAMBIO ↻</div>${fl ? `<div class="tf">${esc(fl)}</div>` : ''}</div>` +
+        (fl ? `<div class="f2">${esc(fl)}</div>` : '') +
+        `<div class="nom"><span>Destinatario</span>${esc(f.nombre || '—')}</div>` +
+        `<div class="reg">${esc(regionShow || '—')}</div>` + (barrio ? `<div class="bar">${esc(barrio)}</div>` : '') +
+        `<div class="dir">${esc(f.calle || '—')}</div>` + (info ? `<div class="info">${info}</div>` : '') +
+        (f.urgente ? '<div class="urg">!! URGENTE !!</div>' : '') +
+        (det ? `<div class="det">${det}</div>` : '') + (f.nota ? `<div class="nota">${esc(f.nota)}</div>` : '') +
+        (c.traer ? '<div class="ban">↻ CAMBIO · retirar paquete anterior ↻</div>' : '') +
+        (caso ? `<div class="casoG">CASO<b>${esc(caso)}</b></div>` : '') +
+        `<div class="foot"><span>mikra.com.ar</span><span class="ven">Venta #${esc(String(c.venta || '').slice(-8))}</span></div></div>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`;
+}
+
+function pintarEtiqueta() {
+    const { c, f } = ETQ, x = c.extra || {}, caso = x.caso && x.caso.id;
+    const inp = (k, lbl, extra) => `<label>${lbl}</label><input data-etq="${k}" value="${esc(f[k])}" ${extra || ''}>`;
+    $('subIn').innerHTML = `<div class="sub-hd"><b>🏷️ Etiqueta de cambio</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+        (ETQ.tapada ? `<div class="chat-aviso">Mercado Libre ya no muestra la dirección de esta venta: completala a mano.</div>` : '') +
+        `<div class="etq-form">` +
+        inp('nombre', 'Destinatario') + inp('zona', 'Zona (como en Flex: "CABA - San Telmo")') + inp('calle', 'Dirección') +
+        inp('ref', 'Piso / depto / referencia') +
+        `<div class="etq-fila"><div>${inp('cp', 'CP', 'inputmode="numeric"')}</div><div>${inp('valor', 'Valor $ (para el caso)', 'inputmode="numeric"')}</div></div>` +
+        `<label>Día de entrega</label><input data-etq="fecha" type="date" value="${esc(f.fecha)}">` +
+        `<label>📦 Llevarle</label><textarea data-etq="lleva" rows="2">${esc(f.lleva)}</textarea>` +
+        (c.traer ? `<label>↩ Retirar</label><textarea data-etq="retira" rows="2">${esc(f.retira)}</textarea>` : '') +
+        inp('nota', 'Nota en la etiqueta (opcional)') +
+        `<label class="etq-chk"><input type="checkbox" data-etq="urgente" ${f.urgente ? 'checked' : ''}> !! URGENTE !!</label></div>` +
+        `<div class="etq-prev"><iframe id="etqPrev" title="Vista previa"></iframe></div>` +
+        `<div class="ayuda" style="text-align:center">${caso ? `Caso <b style="color:var(--text)">${esc(caso)}</b> ya creado en Flex.` : `Al imprimir se crea el caso en Flex (Cambio, vence el ${esc(dmyIso(f.fecha))}).`}</div>` +
+        `<div class="etq-btns"><button class="guardar" id="etqImprimir">🖨️ ${caso ? 'Reimprimir etiqueta' : 'Crear caso e imprimir'}</button>` +
+        (caso ? '' : `<button class="link-btn" id="etqSoloCaso">Solo crear el caso (sin imprimir)</button>`) +
+        `<div class="ayuda" id="etqEstado" style="text-align:center"></div></div>`;
+    refrescarPrev();
+    $('subIn').onclick = async e => {
+        if (e.target.closest('#etqImprimir')) return etqAccion(true, e.target.closest('button'));
+        if (e.target.closest('#etqSoloCaso')) return etqAccion(false, e.target.closest('button'));
+    };
+    $('subIn').oninput = e => {
+        const k = e.target.dataset && e.target.dataset.etq; if (!k || !ETQ) return;
+        ETQ.f[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        clearTimeout(ETQ._t); ETQ._t = setTimeout(refrescarPrev, 250);
+    };
+}
+function refrescarPrev() {
+    const fr = $('etqPrev'); if (!fr || !ETQ) return;
+    const x = ETQ.c.extra || {};
+    fr.srcdoc = etiquetaHTML(ETQ.f, (x.caso && x.caso.id) || '#…', ETQ.c);
+    const w = ($('subIn').clientWidth || 340) - 28, s = Math.min(1.3, w / 265);
+    fr.style.transform = `scale(${s})`;
+    fr.parentElement.style.height = Math.ceil(504 * s) + 'px'; fr.parentElement.style.width = Math.ceil(265 * s) + 'px';
+}
+async function etqAccion(imprimir, btn) {
+    const { c, f } = ETQ, est = $('etqEstado');
+    const valor = Math.round(Number(String(f.valor || '').replace(/\./g, '').split(',')[0].replace(/\D/g, '')) || 0);
+    let x = { ...(c.extra || {}) };
+    if (!x.caso) {
+        if (!f.zona.trim()) return toast('📍 Falta la zona');
+        if (!valor) return toast('💵 Falta el valor (lo pide el caso de Flex)');
+    }
+    btn.disabled = true;
+    try {
+        if (!x.caso) {                                        // 1) caso en Flex
+            est.textContent = 'Creando el caso en Flex…';
+            const notas = [f.lleva ? 'Llevar: ' + f.lleva.replace(/\n/g, ', ') : '', c.traer && f.retira ? 'Retirar: ' + f.retira.replace(/\n/g, ', ') : '', f.nota]
+                .filter(Boolean).join(' · ').slice(0, 450);
+            const direccion = [f.calle, f.ref, f.zona].filter(Boolean).join(' · ');
+            const pedirCaso = async sid => {
+                const p = new URLSearchParams({ action: 'add_reclamo', shippingId: sid, orderId: c.venta || '', comprador: c.nick || f.nombre,
+                    zona: f.zona.trim(), cuenta: c.cuenta || '', tipo: 'cambio', valor: String(valor), fechaEstimada: dmyIso(f.fecha),
+                    notas, direccion, chofer: '' });
+                const r = await fetchT(FLEX_URL + '?' + p.toString(), {}, 15000);
+                const d = await r.json().catch(() => null);
+                if (!d || !d.ok || !d.record) throw new Error((d && d.error) || 'Flex no respondió');
+                return d;
+            };
+            let d = await pedirCaso(ETQ.sid || ('MAN-' + Date.now()));
+            // Ya había un caso ABIERTO de otra cosa para ese envío (ej. una entrega): el cambio va en uno propio
+            if (d.duplicate && d.record.tipo !== 'cambio') d = await pedirCaso((ETQ.sid || 'MAN') + '-CAMBIO-' + Date.now().toString(36));
+            x.caso = { id: d.record.id, at: ahoraARiso(), impreso: false };
+            if (d.duplicate) toast(`Ya había un caso de cambio abierto: ${d.record.id}`);
+            try { const nuevo = await guardarEnNube({ ...c, extra: x }); reemplazar(nuevo); ETQ.c = nuevo; }
+            catch (e) { c.extra = x; }
+        }
+        if (!imprimir) { est.textContent = `✅ Caso ${x.caso.id} creado en Flex`; toast(`✅ Caso ${x.caso.id} creado en Flex`); pintarEtiqueta(); return; }
+        est.textContent = 'Mandando a la impresora…';      // 2) imprimir en la PC (etiqueta grande)
+        const html = etiquetaHTML(f, x.caso.id, ETQ.c);
+        const r = await fetchT(PRINT_URL + '/job', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-Key': PRINT_KEY },
+            body: JSON.stringify({ html, title: 'Cambio ' + (c.nick || f.nombre) + ' ' + x.caso.id, target: 'grande', copies: 1 }) }, 20000);
+        const j = await r.json().catch(() => ({}));
+        if (!j.id) throw new Error(j.error || 'la impresora no respondió');
+        if (j.agentOnline === false) { est.textContent = '🔴 La PC está desconectada: se imprime cuando se conecte'; btn.disabled = false; return; }
+        est.textContent = '🖨️ Imprimiendo…';
+        const fin = Date.now() + 45000;
+        while (Date.now() < fin) {
+            await sleep(1500);
+            let s; try { s = await (await fetchT(PRINT_URL + '/job?id=' + j.id, { cache: 'no-store', headers: { 'X-Key': PRINT_KEY } }, 10000)).json(); } catch (e) { continue; }
+            if (s.status === 'done') {
+                est.textContent = `✅ Etiqueta impresa · caso ${x.caso.id}`; toast(`✅ Etiqueta impresa · caso ${x.caso.id}`);
+                x = { ...((ETQ && ETQ.c.extra) || x), caso: { ...x.caso, impreso: true } };
+                try { const nuevo = await guardarEnNube({ ...ETQ.c, extra: x }); reemplazar(nuevo); ETQ.c = nuevo; } catch (e) {}
+                btn.disabled = false; return;
+            }
+            if (s.status === 'offline') { est.textContent = '⚠️ La etiquetera grande no contesta (¿apagada o sin red?). Prendela y reimprimí.'; btn.disabled = false; return; }
+            if (s.status === 'error') { est.textContent = '⚠️ Error al imprimir: ' + (s.error || ''); btn.disabled = false; return; }
+            if (s.status === 'cancelled' || s.status === 'expired') break;
+        }
+        est.textContent = '⏳ Sigue en cola, todavía no salió';
+    } catch (e) {
+        est.textContent = '⚠️ ' + (e.message || e);
+    }
+    btn.disabled = false;
 }
 
 // ══════════════════════════════════════════════════════════════════════════

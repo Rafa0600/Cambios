@@ -39,7 +39,8 @@
             background: var(--surface-2); color: var(--text); font-size: 17px; display: grid; place-items: center; }
         .hdr-btn.girando { animation: gira .8s linear infinite; }
         @keyframes gira { to { transform: rotate(360deg); } }
-        .resumen { display: flex; gap: 8px; margin: 12px 0 10px; }
+        .resumen { display: flex; gap: 8px; margin: 12px auto 10px; }
+        .hdr-top, .resumen, .tabs { max-width: 680px; margin-left: auto; margin-right: auto; }
         .res-box { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
             padding: 8px 10px; }
         .res-box b { display: block; font-family: 'Space Mono', monospace; font-size: 22px; line-height: 1.1; }
@@ -206,9 +207,9 @@
         textarea.nota:focus { border-color: var(--yellow); }
 
         /* ── Sub-hoja (elegir talle/color, con quién) ── */
-        .sub { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.6); display: none; align-items: flex-end; }
+        .sub { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.6); display: none; align-items: flex-end; justify-content: center; }
         .sub.open { display: flex; }
-        .sub-in { width: 100%; max-height: 88dvh; overflow-y: auto; background: var(--surface); border-radius: 20px 20px 0 0;
+        .sub-in { width: 100%; max-width: 560px; max-height: 88dvh; overflow-y: auto; background: var(--surface); border-radius: 20px 20px 0 0;
             border-top: 1px solid var(--border-bright); padding: 14px 14px calc(18px + env(safe-area-inset-bottom)); animation: sube .2s ease-out; }
         .sub-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
         .sub-hd b { flex: 1; font-size: 16px; }
@@ -284,7 +285,10 @@
         #etqPrev { width: 265px; height: 504px; border: 0; transform-origin: top left; display: block; background: #fff; }
         .etq-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
         .etq-dnd { font-size: 10.5px; color: var(--muted); margin-left: 4px; }
-        .etq-imp { display: flex; gap: 8px; margin-top: 14px; } .etq-imp .btn2 { flex: 1; height: 42px; }
+        .rec-fila { display: flex; align-items: center; gap: 6px; } .rec-fila .it { flex: 1; margin: 0 0 5px; }
+        .etq-imp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+        .etq-imp .btn2 { height: 44px; font-size: 13.5px; padding: 0 8px; text-align: left; }
+        .etq-imp .op-off { opacity: .55; color: var(--green); border-style: dashed; }
         .etq-prevs { display: flex; flex-direction: column; align-items: center; }
         .etq-prev.tk { margin-top: 4px; } #tkPrev { width: 265px; height: 300px; border: 0; transform-origin: top left; display: block; background: #fff; }
         .redactar { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
@@ -743,7 +747,10 @@ function llevaRetira(c) {
             if (c.motivo === 'confusion') {
                 if (c.con && c.con.items && c.con.items.length) retira = c.con.items.map(i => itemHTML(i));
                 else retiraTxt = 'Lo que le llegó por error';
-            } else if (c.motivo === 'otracosa') retiraTxt = 'Lo que le mandamos por error';
+            } else if (c.motivo === 'otracosa') {
+                if (c.con && c.con.items && c.con.items.length) retira = c.con.items.map(i => itemHTML(i));
+                else retiraTxt = 'Lo que le mandamos por error';
+            }
             else retira = sel.map(i => itemHTML(i));
         }
     }
@@ -764,7 +771,7 @@ function detalleTexto(c) {
     if (c.traer) {
         if (CON_NUEVO.has(c.motivo)) retira = (c.items || []).filter(i => i.nuevo).map(f);
         else if (c.motivo === 'confusion') retira = (c.con && c.con.items && c.con.items.length) ? c.con.items.map(f) : ['lo que le llegó por error'];
-        else if (c.motivo === 'otracosa') retira = ['lo que le mandamos por error'];
+        else if (c.motivo === 'otracosa') retira = (c.con && c.con.items && c.con.items.length) ? c.con.items.map(f) : ['lo que le mandamos por error'];
         else retira = (c.items || []).filter(i => i.sel).map(f);
     }
     return { lleva, retira };
@@ -848,7 +855,8 @@ function resumenCorto(c) {
     let txt;
     if (c.motivo === 'confusion') txt = `Mandarle ${sel.length ? sel.map(i => i.n).slice(0, 2).join(', ') : 'lo suyo'}` +
         (c.con && c.con.numero ? ` · se cruzó con ${c.con.numero}` : '');
-    else if (c.motivo === 'otracosa') txt = `Mandarle de nuevo ${sel.length ? sel.map(i => [i.n, i.c, i.t].filter(Boolean).join(' ')).slice(0, 2).join(', ') : 'lo que compró'}`;
+    else if (c.motivo === 'otracosa') txt = `Mandarle de nuevo ${sel.length ? sel.map(i => [i.n, i.c, i.t].filter(Boolean).join(' ')).slice(0, 2).join(', ') : 'lo que compró'}` +
+        (c.con && c.con.items && c.con.items.length ? ` · le llegó ${c.con.items.map(i => [i.c, i.t].filter(Boolean).join(' ')).join(', ')}` : '');
     else if (c.motivo === 'fallado') txt = `Fallado: ${sel.length ? sel.map(i => [i.n, i.c, i.t].filter(Boolean).join(' ')).slice(0, 2).join(', ') : 'ver detalle'}`;
     else txt = c.nota || sel.map(i => i.n).join(', ') || 'Ver detalle';
     return { fotos: sel.map(i => i.img).filter(Boolean).slice(0, 3), txt };
@@ -1050,6 +1058,12 @@ function pintarForm() {
             }
             return `<div class="art${on ? ' on' : ''}">${itemHTML(it)}<div class="art-acc">${acc}</div></div>`;
         }).join('') || '<div class="ayuda">No pude leer los artículos de esta compra (contalo en la nota).</div>';
+        if (F.motivo === 'otracosa') {                       // lo que le llegó (nunca lo compró): es lo que se retira
+            const rec = (F.con && F.con.items) || [];
+            h += `<div class="art${rec.length ? ' on' : ''}" style="margin-top:10px"><div class="ayuda" style="margin:0 0 6px">↩ <b style="color:var(--text)">¿Qué le llegó por error?</b> Es lo que se retira (ej: el mismo en otro color).</div>` +
+                rec.map((i, k) => `<div class="rec-fila">${itemHTML(i)}<button class="btn2" data-recq="${k}" title="Sacar">✕</button></div>`).join('') +
+                `<div class="art-acc"><button class="btn2 amarillo" id="fRec">🔎 ${rec.length ? 'Agregar otro' : 'Elegir lo que le llegó'}</button></div></div>`;
+        }
         if (F.motivo === 'confusion') {
             h += `<div class="art${F.con ? ' on' : ''}" style="margin-top:10px">` +
                 (F.con ? `<div class="ayuda" style="margin:0 0 6px">🔀 Se cruzó con <b style="color:var(--text)">${esc((F.con.numero ? F.con.numero + ' · ' : '') + (F.con.nick || F.con.comprador || ''))}</b> (le llegó lo de ese paquete)</div>` +
@@ -1223,6 +1237,7 @@ $('form').addEventListener('click', async e => {
     const cp = t.closest('[data-compra]'); if (cp) return elegirCompra(+cp.dataset.compra);
     const mo = t.closest('[data-motivo]');
     if (mo) {
+        if (F.motivo !== mo.dataset.motivo) F.con = null;     // "con" es de confusión (con quién) u otra cosa (qué le llegó)
         F.motivo = mo.dataset.motivo;
         // por defecto: mandarle todo lo suyo (si se confundió o le mandamos otra cosa)
         if ((F.motivo === 'confusion' || F.motivo === 'otracosa') && !(F.items || []).some(i => i.sel)) (F.items || []).forEach(i => i.sel = true);
@@ -1234,6 +1249,8 @@ $('form').addEventListener('click', async e => {
     const tr = t.closest('[data-traer]'); if (tr) { F.traer = tr.dataset.traer === '1'; return pintarForm(); }
     const fe = t.closest('[data-fecha]'); if (fe) { F.fecha = fe.dataset.fecha; return pintarForm(); }
     if (t.closest('#fCon')) return abrirConQuien();
+    if (t.closest('#fRec')) return abrirPickerRec();
+    const rq = t.closest('[data-recq]'); if (rq) { F.con.items.splice(+rq.dataset.recq, 1); if (!F.con.items.length) F.con = null; return pintarForm(); }
     if (t.closest('#fMsgs')) return abrirMensajes(F);
     if (t.closest('#fConQuitar')) { F.con = null; return pintarForm(); }
 });
@@ -1252,6 +1269,7 @@ $('btnGuardar').onclick = async () => {
     if (CON_NUEVO.has(datos.motivo)) datos.items.forEach(i => delete i.sel);
     else datos.items.forEach(i => delete i.nuevo);
     datos.extra = datos.extra || {};          // caso de Flex / descuento de Ecom: se conservan al editar
+    if (datos.motivo !== 'confusion' && datos.motivo !== 'otracosa') datos.con = null;
     const btn = $('btnGuardar'); btn.disabled = true; btn.textContent = 'Guardando…';
     try {
         const c = await guardarEnNube(datos);
@@ -1284,6 +1302,14 @@ function abrirPicker(k) {
     $('sub').classList.add('open');
     if (buscar) setTimeout(() => { const i = $('pBuscar'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 60);
 }
+function abrirPickerRec() {
+    const k = Math.max(0, (F.items || []).findIndex(i => i.sel));
+    const it = (F.items || [])[k];
+    const yo = CAT && it && it.sku ? CAT.bySku[it.sku] : null;
+    PICK = { k, rec: true, elegido: null, titulo: (yo && yo.titulo) || '', buscar: !yo, q: it ? String(it.n || '').split(/\s+/)[0] : '' };
+    pintarPicker();
+    $('sub').classList.add('open');
+}
 // Buscar un artículo del catálogo por nombre (todas las palabras), con foto y stock total
 function artsQueCoinciden(q) {
     if (!CAT) return [];
@@ -1310,10 +1336,10 @@ function pintarBusquedaArt() {
 function cerrarSub() { $('sub').classList.remove('open'); PICK = null; ETQ = null; $('subIn').onclick = null; $('subIn').oninput = null; }
 $('sub').addEventListener('click', e => { if (e.target === $('sub') || e.target.closest('[data-cerrar]')) cerrarSub(); });
 function pintarPicker() {
-    const it = F.items[PICK.k];
+    const it = F.items[PICK.k] || { n: '', c: '', t: '', sku: '' };
     const yoReal = CAT && it.sku ? CAT.bySku[it.sku] : null;
     if (PICK.buscar) {                          // ── elegir OTRO artículo ──
-        $('subIn').innerHTML = `<div class="sub-hd"><b>🔄 ¿Por qué artículo lo cambia?</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+        $('subIn').innerHTML = `<div class="sub-hd"><b>${PICK.rec ? '↩ ¿Qué le llegó?' : '🔄 ¿Por qué artículo lo cambia?'}</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
             `<div class="ayuda" style="margin:0 0 8px">Tiene: <b style="color:var(--text)">${esc(it.n)} · ${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b></div>` +
             `<div class="busq"><input id="pBuscar" type="search" autocomplete="off" placeholder="Buscá el artículo (ej: biker liso)" value="${esc(PICK.q)}"></div>` +
             (PICK.titulo ? `<button class="link-btn" id="pVolverArt" style="padding:8px 2px">← Volver a ${esc(PICK.titulo)}</button>` : '') +
@@ -1324,9 +1350,12 @@ function pintarPicker() {
     // la grilla es del artículo elegido (el suyo, u otro si cambia de artículo)
     const vars = PICK.titulo ? (CAT && CAT.porTitulo.get(PICK.titulo)) || [] : [];
     const yo = yoReal && yoReal.titulo === PICK.titulo ? yoReal : (vars[0] ? { ...vars[0], color: '', talle: '' } : null);
-    let h = `<div class="sub-hd"><b>🔁 ${esc(PICK.titulo || it.n)}</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
-        `<div class="ayuda" style="margin:0 0 6px">Tiene: <b style="color:var(--text)">${PICK.titulo && PICK.titulo !== it.n ? esc(it.n) + ' · ' : ''}${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b>. Tocá el talle/color nuevo (el número es el stock en la nube).</div>` +
-        `<button class="link-btn" id="pOtroArt" style="padding:4px 2px 10px">🔄 ¿Lo cambia por otro artículo? Buscalo</button>`;
+    let h = `<div class="sub-hd"><b>${PICK.rec ? '↩' : '🔁'} ${esc(PICK.titulo || it.n)}</b><button class="hdr-btn" data-cerrar>✕</button></div>` +
+        (PICK.rec
+            ? `<div class="ayuda" style="margin:0 0 6px">Compró: <b style="color:var(--text)">${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b> (borde punteado). Tocá <b style="color:var(--text)">lo que le llegó por error</b>.</div>` +
+              `<button class="link-btn" id="pOtroArt" style="padding:4px 2px 10px">🔎 ¿Le llegó otro artículo? Buscalo</button>`
+            : `<div class="ayuda" style="margin:0 0 6px">Tiene: <b style="color:var(--text)">${PICK.titulo && PICK.titulo !== it.n ? esc(it.n) + ' · ' : ''}${esc(it.c || '—')} · T: ${esc(it.t || '—')}</b>. Tocá el talle/color nuevo (el número es el stock en la nube).</div>` +
+              `<button class="link-btn" id="pOtroArt" style="padding:4px 2px 10px">🔄 ¿Lo cambia por otro artículo? Buscalo</button>`);
     if (vars.length > 1 || (vars.length === 1 && PICK.titulo !== (yoReal && yoReal.titulo))) {
         const talles = [...new Set(vars.map(v => v.talle || '—'))].sort((a, b) => talleOrden(a) - talleOrden(b) || a.localeCompare(b));
         const porColor = new Map();
@@ -1339,13 +1368,14 @@ function pintarPicker() {
                 const v = porColor.get(c).get(t);
                 if (!v) return `<td><button class="cel na" disabled>·</button></td>`;
                 const n = Number(v.stock), cls = !isFinite(n) ? '' : n <= 0 ? 's0' : n <= 3 ? 'pocos' : 'hay';
-                return `<td><button class="cel ${cls}${v.sku === it.sku ? ' yo' : ''}${v.sku === PICK.elegido ? ' elegida' : ''}" data-var="${esc(v.sku)}">${isFinite(n) ? n : '?'}</button></td>`;
+                return `<td><button class="cel ${cls}${v.sku === it.sku ? ' yo' : ''}${v.sku === PICK.elegido || (PICK.rec && F.con && (F.con.items || []).some(r => r.sku === v.sku)) ? ' elegida' : ''}" data-var="${esc(v.sku)}">${isFinite(n) ? n : '?'}</button></td>`;
             }).join('') + `</tr>`).join('') + `</table></div>` +
-            `<div class="ley">🟢 hay · 🟠 quedan pocos · gris sin stock · borde punteado = lo que tiene. Stock de la nube${CAT.lastModified ? ` (subido ${esc(cuandoTxt(String(CAT.lastModified).replace(' ', 'T')))})` : ''}: puede haber cambiado.</div>`;
+            `<div class="ley">🟢 hay · 🟠 quedan pocos · gris sin stock · borde punteado = ${PICK.rec ? 'lo que compró' : 'lo que tiene'}. Stock de la nube${CAT.lastModified ? ` (subido ${esc(cuandoTxt(String(CAT.lastModified).replace(' ', 'T')))})` : ''}: puede haber cambiado.</div>`;
     } else {
         h += `<div class="ayuda">${CAT ? 'Este artículo no tiene otros talles/colores en el catálogo de la nube.' : 'Todavía no cargó el catálogo de la nube.'} Escribilo a mano:</div>`;
     }
-    h += `<div class="manual"><input id="pColor" placeholder="Color nuevo" value="${esc(it.nuevo && !it.nuevo.sku ? it.nuevo.c : '')}"><input id="pTalle" placeholder="Talle nuevo" value="${esc(it.nuevo && !it.nuevo.sku ? it.nuevo.t : '')}" style="max-width:110px"><button class="btn2 amarillo" id="pManual">OK</button></div>`;
+    const pre = !PICK.rec && it.nuevo && !it.nuevo.sku ? it.nuevo : null;
+    h += `<div class="manual"><input id="pColor" placeholder="${PICK.rec ? 'Color que le llegó' : 'Color nuevo'}" value="${esc(pre ? pre.c : '')}"><input id="pTalle" placeholder="${PICK.rec ? 'Talle' : 'Talle nuevo'}" value="${esc(pre ? pre.t : '')}" style="max-width:110px"><button class="btn2 amarillo" id="pManual">OK</button></div>`;
     $('subIn').innerHTML = h;
 }
 $('subIn').addEventListener('input', e => {
@@ -1355,21 +1385,30 @@ $('subIn').addEventListener('input', e => {
 });
 $('subIn').addEventListener('click', e => {
     if (!PICK) return;
-    if (e.target.closest('#pOtroArt')) { PICK.buscar = true; PICK.q = PICK.q || String(F.items[PICK.k].n || '').split(/\s+/)[0]; pintarPicker(); setTimeout(() => $('pBuscar') && $('pBuscar').focus(), 60); return; }
+    if (e.target.closest('#pOtroArt')) { PICK.buscar = true; PICK.q = PICK.q || String((F.items[PICK.k] || {}).n || '').split(/\s+/)[0]; pintarPicker(); setTimeout(() => $('pBuscar') && $('pBuscar').focus(), 60); return; }
     if (e.target.closest('#pVolverArt')) { PICK.buscar = false; pintarPicker(); return; }
     const ta = e.target.closest('[data-tit]');
     if (ta) { PICK.titulo = ta.dataset.tit; PICK.buscar = false; pintarPicker(); $('subIn').scrollTop = 0; return; }
     const v = e.target.closest('[data-var]');
     if (v) {
-        const e2 = CAT.bySku[v.dataset.var], it = F.items[PICK.k];
+        const e2 = CAT.bySku[v.dataset.var], it = F.items[PICK.k] || {};
+        if (PICK.rec) {                                      // lo que le llegó por error → se retira
+            if (v.dataset.var === it.sku) return toast('Ese es el que compró: tocá el que le llegó');
+            F.con = { recibio: true, items: [...((F.con && F.con.items) || []), { sku: e2.sku, n: e2.titulo, c: e2.color, t: e2.talle, img: fotoSku(e2.sku), q: 1 }] };
+            cerrarSub(); pintarForm(); return;
+        }
         if (v.dataset.var === it.sku) return toast('Ese es el que ya tiene');
         it.nuevo = { sku: e2.sku, n: e2.titulo, c: e2.color, t: e2.talle, img: fotoSku(e2.sku) };
         if (!(Number(e2.stock) > 0)) toast('Ojo: en la nube figura sin stock');
         cerrarSub(); pintarForm(); return;
     }
     if (e.target.closest('#pManual')) {
-        const c = $('pColor').value.trim(), t = $('pTalle').value.trim(), it = F.items[PICK.k];
+        const c = $('pColor').value.trim(), t = $('pTalle').value.trim(), it = F.items[PICK.k] || {};
         if (!c && !t) return toast('Escribí el color o el talle nuevo');
+        if (PICK.rec) {
+            F.con = { recibio: true, items: [...((F.con && F.con.items) || []), { sku: '', n: PICK.titulo || it.n || '', c, t: t || (PICK.titulo && PICK.titulo !== (CAT && it.sku && CAT.bySku[it.sku] || {}).titulo ? '' : it.t || ''), img: '', q: 1 }] };
+            cerrarSub(); pintarForm(); return;
+        }
         it.nuevo = { sku: '', n: it.n, c: c || it.c, t: t || it.t, img: it.img };
         cerrarSub(); pintarForm();
     }
@@ -1417,6 +1456,24 @@ async function abrirConQuien() {
 //  Movimientos como manual (y se copia al Excel con el resto). Pide la clave del stock.
 // ══════════════════════════════════════════════════════════════════════════
 const ahoraARiso = () => new Date().toLocaleString('sv-SE', { timeZone: TZ }).replace(' ', 'T');
+// Descuenta de Ecom lo que sale (lo que todavía no se descontó) y devuelve el extra nuevo, SIN guardarlo.
+async function descuentoEcomCore(c) {
+    const x = c.extra || {};
+    const ya = new Set(((x.desc && x.desc.items) || []).filter(i => i.ok).map(i => i.sku));
+    const aDesc = loQueSale(c).filter(i => i.sku && !ya.has(i.sku));
+    if (!aDesc.length) return { extra: x, okN: [], mal: [], nada: true };
+    const motivo = ('Ajuste manual · cambio ' + (c.nick || c.comprador || '')).slice(0, 80);
+    const r = await fetchConClave(`${ECOMM_PROXY}/bulk-update-stock`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aDesc.map(i => ({ sku: i.sku, qty: i.q, motivo }))) });       // qty positivo = RESTA (convención del worker)
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !Array.isArray(d.results)) throw new Error(d.error || 'respondió ' + r.status);
+    const res = d.results.map((rr, k) => ({ sku: String(rr.sku), q: aDesc[k].q, ok: !!rr.ok, antes: rr.stock_anterior, despues: rr.stock_nuevo, error: rr.error || '' }));
+    const okN = res.filter(i => i.ok), mal = res.filter(i => !i.ok);
+    const prev = ((x.desc && x.desc.items) || []).filter(i => i.ok);
+    return { extra: { ...x, desc: { at: ahoraARiso(), items: [...prev, ...okN], errores: mal } }, okN, mal };
+}
+const txtDesc = (okN, mal) => (okN.length ? `${okN.map(i => `${i.sku} ${i.antes}→${i.despues}`).join(', ')}` : '') +
+    (mal.length ? `${okN.length ? ' · ' : ''}⚠️ no se pudo: ${mal.map(i => `${i.sku} (${i.error})`).join(', ')}` : '');
 async function descontarEcom(c, btn) {
     const x = c.extra || {};
     const ya = new Set(((x.desc && x.desc.items) || []).filter(i => i.ok).map(i => i.sku));
@@ -1427,26 +1484,12 @@ async function descontarEcom(c, btn) {
         (sinSku.length ? `\n\n(sin SKU, no se descuenta: ${sinSku.map(i => i.n).join(', ')})` : '') +
         `\n\nQueda como "Ajuste manual" (sale en Movimientos para el Excel). Lo que retira NO se suma: entra cuando llegue.`)) return;
     if (btn) { btn.disabled = true; btn.textContent = '➖ …'; }
-    const motivo = ('Ajuste manual · cambio ' + (c.nick || c.comprador || '')).slice(0, 80);
-    let res;
-    try {
-        const r = await fetchConClave(`${ECOMM_PROXY}/bulk-update-stock`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(aDesc.map(i => ({ sku: i.sku, qty: i.q, motivo }))) });       // qty positivo = RESTA (convención del worker)
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok || !Array.isArray(d.results)) throw new Error(d.error || 'respondió ' + r.status);
-        res = d.results.map((rr, k) => ({ sku: String(rr.sku), q: aDesc[k].q, ok: !!rr.ok, antes: rr.stock_anterior, despues: rr.stock_nuevo, error: rr.error || '' }));
-    } catch (e) {
-        if (btn) { btn.disabled = false; btn.textContent = '➖ Ecom'; }
-        return toast('No se pudo descontar: ' + (e.message || e), null, null, 6000);
-    }
-    const okN = res.filter(i => i.ok), mal = res.filter(i => !i.ok);
-    const prev = ((x.desc && x.desc.items) || []).filter(i => i.ok);
-    const extra = { ...x, desc: { at: ahoraARiso(), items: [...prev, ...okN], errores: mal } };
-    try { reemplazar(await guardarEnNube({ ...c, extra })); }
-    catch (e) { c.extra = extra; reemplazar(c); toast('⚠️ Se descontó pero no se guardó la marca en la nube (no lo vuelvas a descontar)', null, null, 8000); return; }
-    toast(okN.length ? `➖ Descontado de Ecom: ${okN.map(i => `${i.sku} ${i.antes}→${i.despues}`).join(', ')}` +
-            (mal.length ? ` · ⚠️ no se pudo: ${mal.map(i => `${i.sku} (${i.error})`).join(', ')}` : '')
-        : `⚠️ No se descontó: ${mal.map(i => `${i.sku} (${i.error})`).join(', ')}`, null, null, 8000);
+    let r;
+    try { r = await descuentoEcomCore(c); }
+    catch (e) { if (btn) { btn.disabled = false; btn.textContent = '➖ Ecom'; } return toast('No se pudo descontar: ' + (e.message || e), null, null, 6000); }
+    try { reemplazar(await guardarEnNube({ ...c, extra: r.extra })); }
+    catch (e) { c.extra = r.extra; reemplazar(c); toast('⚠️ Se descontó pero no se guardó la marca en la nube (no lo vuelvas a descontar)', null, null, 8000); return; }
+    toast((r.okN.length ? '➖ Descontado de Ecom: ' : '⚠️ No se descontó: ') + txtDesc(r.okN, r.mal), null, null, 8000);
 }
 
 // ── Compartir por WhatsApp (para registrarlo a mano si hace falta): lo que sale, en negativo ──
@@ -1522,7 +1565,8 @@ async function abrirEtiqueta(c) {
     ETQ.sid = sh ? String(sh.id) : String(c.envio || '');
     ETQ.tapada = tapada;
     ETQ.llevaAuto = lleva.join('\n');
-    ETQ.imp = { grande: true, oficina: true };      // qué se imprime (las dos por defecto)
+    // qué hace el botón: todo marcado (lo que no aplica, apagado); se destilda lo que no se quiera
+    ETQ.imp = { grande: true, oficina: true, ecom: descPendiente(c), hecho: c.estado !== 'hecho' };
     ETQ.f = {
         nombre: ra.receiver_name || c.comprador || c.nick || '',
         zona: (ra.city || ra.neighborhood) ? zonaDetallada(nombreDe(ra.neighborhood), nombreDe(ra.city), ra.zip_code) : '',
@@ -1614,6 +1658,27 @@ function ticketHTML(f, caso, c) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`;
 }
 
+// Las 4 opciones (tildadas = se hacen al tocar el botón)
+function opcionesHTML() {
+    const { c } = ETQ, im = ETQ.imp, yaDesc = !descPendiente(c), hecho = c.estado === 'hecho';
+    const op = (k, txt, off, offTxt) => off
+        ? `<button class="btn2 op-off" data-imp="${k}" disabled>✓ ${offTxt}</button>`
+        : `<button class="btn2${im[k] ? ' on' : ''}" data-imp="${k}">${im[k] ? '☑' : '☐'} ${txt}</button>`;
+    return op('grande', '📦 Etiqueta grande') + op('oficina', '🎫 Ticket oficina') +
+        op('ecom', '➖ Descontar de Ecom', yaDesc, loQueSale(c).some(i => i.sku) ? 'Ya descontado de Ecom' : 'Ecom: sin SKU') +
+        op('hecho', '✅ Marcar hecho', hecho, 'Ya está hecho');
+}
+function textoBotonEtq() {
+    const im = ETQ.imp, x = ETQ.c.extra || {}, partes = [];
+    if (!x.caso) partes.push('crear caso');
+    if (im.grande || im.oficina) partes.push('imprimir');
+    if (im.ecom && descPendiente(ETQ.c)) partes.push('descontar Ecom');
+    if (im.hecho && ETQ.c.estado !== 'hecho') partes.push('marcar hecho');
+    if (!partes.length) return 'Nada marcado';
+    const t = partes.join(', ');
+    return '▶ ' + t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 function pintarEtiqueta() {
     const { c, f } = ETQ, x = c.extra || {}, caso = x.caso && x.caso.id;
     const inp = (k, lbl, extra) => `<label>${lbl}</label><input data-etq="${k}" value="${esc(f[k])}" ${extra || ''}>`;
@@ -1628,19 +1693,26 @@ function pintarEtiqueta() {
         (c.traer ? `<label>↩ Retirar <span class="etq-dnd">va solo en el caso de Flex (para reconocer el paquete cuando vuelve)</span></label><textarea data-etq="retira" rows="2">${esc(f.retira)}</textarea>` : '') +
         inp('nota', 'Nota en la etiqueta (opcional)') +
         `<label class="etq-chk"><input type="checkbox" data-etq="urgente" ${f.urgente ? 'checked' : ''}> !! URGENTE !!</label></div>` +
-        `<div class="etq-imp"><button class="btn2${ETQ.imp.grande ? ' on' : ''}" data-imp="grande">${ETQ.imp.grande ? '✓ ' : ''}📦 Etiqueta grande</button>` +
-            `<button class="btn2${ETQ.imp.oficina ? ' on' : ''}" data-imp="oficina">${ETQ.imp.oficina ? '✓ ' : ''}🎫 Ticket oficina</button></div>` +
+        `<div class="etq-imp" id="etqOpc">${opcionesHTML()}</div>` +
         `<div class="etq-prevs"><div class="etq-prev"><iframe id="etqPrev" title="Etiqueta"></iframe></div>` +
             `<div class="etq-prev tk"><iframe id="tkPrev" title="Ticket"></iframe></div></div>` +
-        `<div class="ayuda" style="text-align:center">${caso ? `Caso <b style="color:var(--text)">${esc(caso)}</b> ya creado en Flex.` : `Al imprimir se crea el caso en Flex (Cambio, vence el ${esc(dmyIso(f.fecha))}).`}</div>` +
-        `<div class="etq-btns"><button class="guardar" id="etqImprimir">🖨️ ${caso ? 'Reimprimir' : 'Crear caso e imprimir'}</button>` +
+        `<div class="ayuda" style="text-align:center">${caso ? `Caso <b style="color:var(--text)">${esc(caso)}</b> ya creado en Flex.` : `Se crea el caso en Flex (Cambio, vence el ${esc(dmyIso(f.fecha))}).`}</div>` +
+        `<div class="etq-btns"><button class="guardar" id="etqImprimir">${textoBotonEtq()}</button>` +
         (caso ? '' : `<button class="link-btn" id="etqSoloCaso">Solo crear el caso (sin imprimir)</button>`) +
         `<div class="ayuda" id="etqEstado" style="text-align:center"></div></div>`;
     refrescarPrev();
     $('subIn').onclick = async e => {
         const ib = e.target.closest('[data-imp]');
-        if (ib) { ETQ.imp[ib.dataset.imp] = !ETQ.imp[ib.dataset.imp]; ib.classList.toggle('on'); ib.textContent = (ETQ.imp[ib.dataset.imp] ? '✓ ' : '') + ib.textContent.replace(/^✓ /, ''); return; }
-        if (e.target.closest('#etqImprimir')) return etqAccion(true, e.target.closest('button'));
+        if (ib) {
+            if (ib.disabled) return;
+            ETQ.imp[ib.dataset.imp] = !ETQ.imp[ib.dataset.imp];
+            $('etqOpc').innerHTML = opcionesHTML(); $('etqImprimir').textContent = textoBotonEtq();
+            return;
+        }
+        if (e.target.closest('#etqImprimir')) {
+            if (textoBotonEtq() === 'Nada marcado') return toast('Marcá qué querés hacer');
+            return etqAccion(true, e.target.closest('button'));
+        }
         if (e.target.closest('#etqSoloCaso')) return etqAccion(false, e.target.closest('button'));
     };
     $('subIn').oninput = e => {
@@ -1696,12 +1768,12 @@ async function etqAccion(imprimir, btn) {
             catch (e) { c.extra = x; }
         }
         if (!imprimir) { est.textContent = `✅ Caso ${x.caso.id} creado en Flex`; toast(`✅ Caso ${x.caso.id} creado en Flex`); pintarEtiqueta(); return; }
-        // 2) imprimir en la PC: etiqueta grande + ticket de la oficina, en paralelo
+        // 2) en paralelo: etiqueta grande + ticket de la oficina + descontar de Ecom
         const quiero = ['grande', 'oficina'].filter(t => ETQ.imp[t]);
-        if (!quiero.length) { est.textContent = 'Elegí qué imprimir (etiqueta y/o ticket)'; btn.disabled = false; return; }
-        const NOM = { grande: 'Etiqueta', oficina: 'Ticket' };
-        const estado = {}; quiero.forEach(t => estado[t] = '⏳');
-        const pintarEst = () => { est.textContent = quiero.map(t => `${NOM[t]} ${estado[t]}`).join(' · '); };
+        const conEcom = ETQ.imp.ecom && descPendiente(ETQ.c), conHecho = ETQ.imp.hecho && ETQ.c.estado !== 'hecho';
+        const NOM = { grande: 'Etiqueta', oficina: 'Ticket', ecom: 'Ecom' };
+        const estado = {}; quiero.forEach(t => estado[t] = '⏳'); if (conEcom) estado.ecom = '⏳';
+        const pintarEst = () => { est.textContent = Object.keys(estado).map(t => `${NOM[t]} ${estado[t]}`).join(' · '); };
         pintarEst();
         const trabajos = quiero.map(async t => {
             try {
@@ -1724,12 +1796,29 @@ async function etqAccion(imprimir, btn) {
                 estado[t] = '⏳ en cola'; pintarEst(); return false;
             } catch (e) { estado[t] = '⚠️ ' + (e.message || e); pintarEst(); return false; }
         });
-        const ok = await Promise.all(trabajos);
-        if (ok.every(Boolean)) toast(`✅ Impreso · caso ${x.caso.id}`);
-        if (ok[quiero.indexOf('grande')]) {                 // la etiqueta salió: queda marcada
-            x = { ...((ETQ && ETQ.c.extra) || x), caso: { ...x.caso, impreso: true } };
-            try { const nuevo = await guardarEnNube({ ...ETQ.c, extra: x }); reemplazar(nuevo); ETQ.c = nuevo; } catch (e) {}
-        }
+        let ecomRes = null;
+        const trabajoEcom = conEcom ? (async () => {
+            try {
+                ecomRes = await descuentoEcomCore(ETQ.c);
+                estado.ecom = ecomRes.mal.length ? '⚠️ ' + txtDesc(ecomRes.okN, ecomRes.mal) : '✅ ' + txtDesc(ecomRes.okN, []);
+                pintarEst(); return !ecomRes.mal.length;
+            } catch (e) { estado.ecom = '⚠️ ' + (e.message || e); pintarEst(); return false; }
+        })() : Promise.resolve(true);
+        const okImp = await Promise.all(trabajos), okEcom = await trabajoEcom;
+        // 3) guardar todo junto: etiqueta impresa, descuento de Ecom y, si salió TODO bien, hecho
+        let xf = { ...((ETQ && ETQ.c.extra) || x) };
+        if (ecomRes) xf = { ...xf, desc: ecomRes.extra.desc };
+        if (okImp[quiero.indexOf('grande')]) xf.caso = { ...xf.caso, impreso: true };
+        const todoOk = okImp.every(Boolean) && okEcom;
+        const nuevoEstado = conHecho && todoOk ? 'hecho' : ETQ.c.estado;
+        try { const nuevo = await guardarEnNube({ ...ETQ.c, extra: xf, estado: nuevoEstado }); reemplazar(nuevo); ETQ.c = nuevo; }
+        catch (e) { ETQ.c.extra = xf; reemplazar(ETQ.c); if (ecomRes) toast('⚠️ Se descontó de Ecom pero no se guardó la marca en la nube (no lo vuelvas a descontar)', null, null, 8000); }
+        if (todoOk) {
+            const hecho = nuevoEstado === 'hecho';
+            toast(`✅ Listo · caso ${x.caso.id}${hecho ? ' · pasó a Hechos' : ''}`, null, null, 5000);
+            if (hecho) { est.textContent += ' · ✅ Hecho'; setTimeout(() => { if (ETQ && ETQ.c.id === c.id) cerrarSub(); }, 1800); }
+        } else if (conHecho) est.textContent += ' · no se marcó hecho (algo no salió)';
+        $('etqOpc') && ($('etqOpc').innerHTML = opcionesHTML());
     } catch (e) {
         est.textContent = '⚠️ ' + (e.message || e);
     }

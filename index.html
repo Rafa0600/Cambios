@@ -1936,7 +1936,9 @@ async function etqAccion(imprimir, btn) {
     const caso = (x.caso && x.caso.id) || '%%CASO%%';          // la nube pone el número cuando crea el caso
     const pasos = {};
     if (!x.caso) {
-        const notas = [f.lleva ? 'Llevar: ' + f.lleva.replace(/\n/g, ', ') : '', c.traer && f.retira ? 'Retirar: ' + f.retira.replace(/\n/g, ', ') : '', f.nota]
+        // " ; " separa artículos (una coma puede ser parte del nombre): Envíos Flex los muestra uno por renglón
+        const lista = t => t.split('\n').map(x => x.trim()).filter(Boolean).join(' ; ');
+        const notas = [f.lleva ? 'Llevar: ' + lista(f.lleva) : '', c.traer && f.retira ? 'Retirar: ' + lista(f.retira) : '', f.nota]
             .filter(Boolean).join(' · ').slice(0, 450);
         pasos.caso = { shippingId: ETQ.sid || ('MAN-' + Date.now()), orderId: c.venta || '', comprador: c.nick || f.nombre,
             zona: f.zona.trim(), cuenta: c.cuenta || '', tipo: 'cambio', valor: String(valor), fechaEstimada: dmyIso(f.fecha),
